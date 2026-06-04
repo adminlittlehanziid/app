@@ -1387,8 +1387,10 @@ const initials = n  => n.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase
 
 function openWA(wa, msg) {
   if (!wa) { showToast('⚠ No. WA belum diisi di data murid'); return; }
-  let num = wa.replace(/\D/g,'');
+  // Fix B: paksa string dulu agar aman jika angka dari Sheet
+  let num = String(wa || '').replace(/\D/g,'');
   if (num.startsWith('0')) num = '62' + num.slice(1);
+  if (!num) { showToast('⚠ No. WA tidak valid'); return; }
   window.open(`https://wa.me/${num}?text=${encodeURIComponent(msg)}`, '_blank');
 }
 

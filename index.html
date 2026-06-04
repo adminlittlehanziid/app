@@ -643,6 +643,47 @@ let students = [];
 const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const WDAYS  = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
 
+// ── Google Sheets API ─────────────────────────────────
+const API = 'https://script.google.com/macros/s/AKfycby0OpOs8nZGqBSbTPq3BxYuYACLG0p9EY65fM8UDgC4rqilwgJLqc-f7km91XNF6U6JQQ/exec';
+
+async function apiGet(params) {
+  try {
+    const r = await fetch(API + '?' + new URLSearchParams(params));
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    return d;
+  } catch(e) { console.warn('API GET error:', e.message); throw e; }
+}
+
+async function apiPost(body) {
+  try {
+    const r = await fetch(API, { method: 'POST', body: JSON.stringify(body) });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    return d;
+  } catch(e) { console.warn('API POST error:', e.message); throw e; }
+}
+
+// Sync semua data dari Sheets (background, tidak blokir UI)
+async function syncFromAPI() {
+  try {
+    const data = await apiGet({ action: 'get_all' });
+    if (Array.isArray(data.students) && data.students.length > 0) {
+      students = data.students;
+      saveStudents();
+      refreshAllSelects();
+      renderStudentList();
+    }
+    if (Array.isArray(data.exams)) {
+      lsSet('lh_exams', data.exams);
+      renderExamList();
+      renderJadwal();
+    }
+  } catch(e) {
+    console.log('Sync offline — pakai data lokal');
+  }
+}
+
 // LocalStorage
 const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v !== null ? JSON.parse(v) : d; } catch { return d; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
@@ -713,6 +754,8 @@ function init() {
   renderStudentList();
   renderJadwal();
   renderExamList();
+  // Sync dari Google Sheets di background
+  syncFromAPI();
 }
 
 // ══════════════════════════════════════════════════
@@ -816,8 +859,12 @@ function renderJadwal() {
 function toggleJadwalDay(day) {
   const sid = document.getElementById('jadwal-murid').value;
   if (!sid) { showToast('Pilih murid dulu untuk catat sesi'); return; }
-  toggleAbs(sid, jadwalYear, MONTHS[jadwalMonth], day);
+  const mn  = MONTHS[jadwalMonth];
+  toggleAbs(sid, jadwalYear, mn, day);
   renderJadwal();
+  // Sync ke Sheets
+  const days = getAbs(sid, jadwalYear, mn);
+  apiPost({ action: 'set_absensi', studentId: sid, year: jadwalYear, month: mn, days }).catch(console.warn);
 }
 
 // ══════════════════════════════════════════════════
@@ -837,9 +884,11 @@ function saveExam() {
   const dateStr = document.getElementById('exam-date-input').value;
   const subject = document.getElementById('exam-subject').value.trim();
   if (!dateStr || !subject) { showToast('⚠ Tanggal & keterangan wajib diisi'); return; }
+  const eid   = Date.now().toString();
   const exams = getExams();
-  exams.push({ id: Date.now().toString(), studentId: sid, date: dateStr, subject });
+  exams.push({ id: eid, studentId: sid, date: dateStr, subject });
   saveExams(exams);
+  apiPost({ action: 'add_exam', id: eid, studentId: sid, date: dateStr, subject }).catch(console.warn);
   closeExamModal();
   renderJadwal();
   renderExamList();
@@ -851,6 +900,7 @@ function deleteExam(id) {
   renderJadwal();
   renderExamList();
   showToast('Reminder dihapus');
+  apiPost({ action: 'delete_exam', id }).catch(console.warn);
 }
 
 function renderExamList() {
@@ -937,6 +987,7 @@ function saveDailyData() {
   if (!s || !dt) { showToast('⚠ Pilih murid dan tanggal'); return; }
   saveDaily(s.id, dt, dailyData);
   showToast('✓ Laporan harian disimpan');
+  apiPost({ action: 'set_daily', studentId: s.id, date: dt, ...dailyData }).catch(console.warn);
 }
 
 function buildDailyMsg() {
@@ -1022,6 +1073,7 @@ function saveMonthlyData() {
   if (!s) { showToast('⚠ Pilih murid'); return; }
   saveMonthly(s.id, y, b, monthlyData);
   showToast('✓ Laporan bulanan disimpan');
+  apiPost({ action: 'set_monthly', studentId: s.id, year: y, month: b, ...monthlyData }).catch(console.warn);
 }
 
 function buildMonthlyMsg() {
@@ -1144,6 +1196,7 @@ function genInvNo(nama, bulan, tahun) {
   return `LH-${inits}-${tahun}${mi}`;
 }
 
+let invSyncTimer;
 function onInvInput() {
   const s = getSelStu('inv-murid');
   const b = document.getElementById('inv-bulan').value;
@@ -1157,6 +1210,11 @@ function onInvInput() {
   if (s) saveInv(s.id, y, b, invData);
   updateInvPreview();
   renderInvStatusList();
+  // Debounce sync ke Sheets (1.5 detik setelah berhenti ketik)
+  clearTimeout(invSyncTimer);
+  invSyncTimer = setTimeout(() => {
+    if (s) apiPost({ action: 'set_invoice', studentId: s.id, year: y, month: b, ...invData }).catch(console.warn);
+  }, 1500);
 }
 
 function buildInvoiceMsg() {
@@ -1240,12 +1298,14 @@ function saveStudent() {
   const fee    = parseInt(document.getElementById('f-fee').value)||0;
   const wa     = document.getElementById('f-wa').value.trim();
   const note   = document.getElementById('f-note').value.trim();
-  students.push({ id: Date.now().toString(), nama, school, grade, start, fee, wa, note });
+  const s = { id: Date.now().toString(), nama, school, grade, start, fee, wa, note };
+  students.push(s);
   saveStudents();
   toggleAddForm();
   renderStudentList();
   refreshAllSelects();
   showToast(`✓ ${nama} ditambahkan`);
+  apiPost({ action: 'add_murid', ...s }).catch(console.warn);
 }
 
 function deleteStudent(id) {
@@ -1254,6 +1314,7 @@ function deleteStudent(id) {
   students = students.filter(x=>x.id!==id);
   saveStudents(); renderStudentList(); refreshAllSelects();
   showToast('Murid dihapus');
+  apiPost({ action: 'delete_murid', id }).catch(console.warn);
 }
 
 function openEdit(id) {
@@ -1285,6 +1346,8 @@ function saveEdit() {
   });
   saveStudents(); closeEdit(); renderStudentList(); refreshAllSelects();
   showToast(`✓ Data ${nama} diperbarui`);
+  const updated = students.find(s => s.id === id);
+  if (updated) apiPost({ action: 'update_murid', ...updated }).catch(console.warn);
 }
 
 function renderStudentList() {

@@ -243,6 +243,32 @@
   .report-field { margin-bottom: 12px; }
   .auto-banner { display: flex; align-items: center; gap: 10px; background: var(--yellow-light); border: 1.5px solid #DCA820; border-radius: 10px; padding: 10px 14px; margin-bottom: 1rem; font-size: 12.5px; font-weight: 600; color: #7A6010; }
 
+  /* ── Riwayat Laporan ── */
+  .history-section { margin-top: 1.25rem; }
+  .history-title { font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); margin-bottom: .75rem; display: flex; align-items: center; gap: 8px; }
+  .history-title::after { content: ''; flex: 1; height: 1.5px; background: var(--cream); }
+  .history-card {
+    border: 1.5px solid var(--border); border-radius: 12px;
+    background: var(--paper); margin-bottom: 8px; overflow: hidden;
+  }
+  .history-card-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; cursor: pointer; user-select: none;
+    transition: background .15s;
+  }
+  .history-card-head:hover { background: var(--teal-light); }
+  .history-card-date { font-size: 13px; font-weight: 700; color: var(--ink); }
+  .history-card-preview { font-size: 11.5px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+  .history-card-arrow { font-size: 12px; color: var(--muted); transition: transform .2s; flex-shrink: 0; }
+  .history-card.open .history-card-arrow { transform: rotate(180deg); }
+  .history-card-body { display: none; padding: 0 14px 12px; border-top: 1.5px solid var(--cream); }
+  .history-card.open .history-card-body { display: block; }
+  .history-field { margin-top: 10px; }
+  .history-field-label { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+  .history-field-val { font-size: 13px; color: var(--ink); line-height: 1.55; white-space: pre-wrap; }
+  .history-card-actions { display: flex; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--cream); }
+  .history-empty { text-align: center; padding: 1.25rem; color: var(--muted); font-size: 12.5px; font-weight: 600; }
+
   /* ── Toggle switch ── */
   .toggle-switch { position: relative; width: 48px; height: 27px; flex-shrink: 0; }
   .toggle-switch input { opacity: 0; width: 0; height: 0; }
@@ -414,6 +440,17 @@
       </button>
     </div>
   </div>
+
+  <!-- Riwayat laporan harian -->
+  <div class="section" id="daily-history-section" style="display:none">
+    <div class="section-header">
+      <div class="section-header-left">
+        <div class="section-icon yellow">🗂️</div>
+        <div class="section-title">Riwayat Laporan Harian</div>
+      </div>
+    </div>
+    <div id="daily-history-list"></div>
+  </div>
 </div>
 
 <!-- ══ LAPORAN BULANAN ══ -->
@@ -468,6 +505,17 @@
         Kirim ke Ortu
       </button>
     </div>
+  </div>
+
+  <!-- Riwayat laporan bulanan -->
+  <div class="section" id="monthly-history-section" style="display:none">
+    <div class="section-header">
+      <div class="section-header-left">
+        <div class="section-icon green">🗂️</div>
+        <div class="section-title">Riwayat Laporan Bulanan</div>
+      </div>
+    </div>
+    <div id="monthly-history-list"></div>
   </div>
 </div>
 
@@ -945,10 +993,13 @@ function loadDailyReport() {
 
   if (!s) {
     frm.innerHTML = '<div class="empty"><div class="empty-icon">👤</div><div>Pilih murid untuk laporan harian</div></div>';
-    prv.style.display = 'none'; return;
+    prv.style.display = 'none';
+    document.getElementById('daily-history-section').style.display = 'none';
+    return;
   }
 
   dailyData = dt ? getDaily(s.id, dt) : { topics:'', homework:'', improvement:'', note:'' };
+  renderDailyHistory(s.id);
 
   frm.innerHTML = `
     <div class="report-field">
@@ -988,6 +1039,80 @@ function saveDailyData() {
   saveDaily(s.id, dt, dailyData);
   showToast('✓ Laporan harian disimpan');
   apiPost({ action: 'set_daily', studentId: s.id, date: dt, ...dailyData }).catch(console.warn);
+  renderDailyHistory(s.id);
+}
+
+// ── RIWAYAT LAPORAN HARIAN ────────────────────────────
+function renderDailyHistory(sid) {
+  const sec = document.getElementById('daily-history-section');
+  const el  = document.getElementById('daily-history-list');
+  if (!sec || !el || !sid) { if(sec) sec.style.display='none'; return; }
+
+  // Kumpulkan semua laporan harian untuk murid ini dari localStorage
+  const reports = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(`lh_daily_${sid}_`)) {
+      const date = k.replace(`lh_daily_${sid}_`, '');
+      const d    = lsGet(k, null);
+      if (d && (d.topics || d.homework || d.improvement || d.note)) {
+        reports.push({ date, ...d });
+      }
+    }
+  }
+
+  if (!reports.length) {
+    sec.style.display = 'block';
+    el.innerHTML = '<div class="history-empty">📭 Belum ada laporan tersimpan untuk murid ini</div>';
+    return;
+  }
+
+  // Urutkan terbaru dulu
+  reports.sort((a, b) => b.date.localeCompare(a.date));
+  sec.style.display = 'block';
+
+  el.innerHTML = reports.map((r, i) => {
+    const d    = new Date(r.date + 'T00:00:00');
+    const tgl  = d.toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+    const prev = r.topics || r.homework || '—';
+    return `<div class="history-card" id="dhc-${i}">
+      <div class="history-card-head" onclick="toggleHistory('dhc-${i}')">
+        <div>
+          <div class="history-card-date">📅 ${d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})}</div>
+          <div class="history-card-preview">${esc(prev.slice(0,60))}${prev.length>60?'…':''}</div>
+        </div>
+        <span class="history-card-arrow">▼</span>
+      </div>
+      <div class="history-card-body">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">${tgl}</div>
+        ${r.topics      ? `<div class="history-field"><div class="history-field-label">📖 Topics Covered</div><div class="history-field-val">${esc(r.topics)}</div></div>` : ''}
+        ${r.homework    ? `<div class="history-field"><div class="history-field-label">✏️ Homework / PR</div><div class="history-field-val">${esc(r.homework)}</div></div>` : ''}
+        ${r.improvement ? `<div class="history-field"><div class="history-field-label">💪 Needs Improvement</div><div class="history-field-val">${esc(r.improvement)}</div></div>` : ''}
+        ${r.note        ? `<div class="history-field"><div class="history-field-label">📝 Teacher's Note</div><div class="history-field-val">${esc(r.note)}</div></div>` : ''}
+        <div class="history-card-actions">
+          <button class="btn-sm primary" onclick="loadDateIntoForm('${r.date}')">✏️ Buka & Edit</button>
+          <button class="btn-sm danger"  onclick="deleteDailyReport('${sid}','${r.date}')">Hapus</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleHistory(id) {
+  document.getElementById(id)?.classList.toggle('open');
+}
+
+function loadDateIntoForm(date) {
+  document.getElementById('daily-date').value = date;
+  loadDailyReport();
+  document.getElementById('daily-form')?.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function deleteDailyReport(sid, date) {
+  if (!confirm(`Hapus laporan ${date}?`)) return;
+  localStorage.removeItem(dailyKey(sid, date));
+  renderDailyHistory(sid);
+  showToast('Laporan dihapus');
 }
 
 function buildDailyMsg() {
@@ -1033,11 +1158,14 @@ function loadMonthlyReport() {
 
   if (!s) {
     frm.innerHTML = '<div class="empty"><div class="empty-icon">👤</div><div>Pilih murid untuk laporan bulanan</div></div>';
-    prv.style.display='none'; return;
+    prv.style.display = 'none';
+    document.getElementById('monthly-history-section').style.display = 'none';
+    return;
   }
 
   const sessions  = getAbs(s.id, y, b).length;
   monthlyData = getMonthly(s.id, y, b);
+  renderMonthlyHistory(s.id);
 
   frm.innerHTML = `
     <div class="auto-banner">⚡ Total sesi <strong>${b} ${y}</strong>: <strong>${sessions} pertemuan</strong> (dari data Jadwal)</div>
@@ -1074,6 +1202,79 @@ function saveMonthlyData() {
   saveMonthly(s.id, y, b, monthlyData);
   showToast('✓ Laporan bulanan disimpan');
   apiPost({ action: 'set_monthly', studentId: s.id, year: y, month: b, ...monthlyData }).catch(console.warn);
+  renderMonthlyHistory(s.id);
+}
+
+// ── RIWAYAT LAPORAN BULANAN ───────────────────────────
+function renderMonthlyHistory(sid) {
+  const sec = document.getElementById('monthly-history-section');
+  const el  = document.getElementById('monthly-history-list');
+  if (!sec || !el || !sid) { if(sec) sec.style.display='none'; return; }
+
+  // Kumpulkan semua laporan bulanan dari localStorage
+  const reports = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(`lh_monthly_${sid}_`)) {
+      const parts = k.replace(`lh_monthly_${sid}_`, '').split('_');
+      const year  = parts[0];
+      const month = parts[1];
+      const d     = lsGet(k, null);
+      if (d && (d.progress || d.improvement || d.note)) {
+        const sessions = getAbs(sid, parseInt(year), month).length;
+        reports.push({ year, month, sessions, ...d });
+      }
+    }
+  }
+
+  if (!reports.length) {
+    sec.style.display = 'block';
+    el.innerHTML = '<div class="history-empty">📭 Belum ada laporan bulanan tersimpan</div>';
+    return;
+  }
+
+  // Urutkan terbaru dulu
+  reports.sort((a, b) => {
+    if (b.year !== a.year) return b.year - a.year;
+    return MONTHS.indexOf(b.month) - MONTHS.indexOf(a.month);
+  });
+  sec.style.display = 'block';
+
+  el.innerHTML = reports.map((r, i) => {
+    const prev = r.progress || r.note || '—';
+    return `<div class="history-card" id="mhc-${i}">
+      <div class="history-card-head" onclick="toggleHistory('mhc-${i}')">
+        <div>
+          <div class="history-card-date">📅 ${r.month} ${r.year} <span style="background:var(--teal-light);color:var(--teal-dark);border-radius:5px;padding:1px 7px;font-size:10px;font-weight:700;margin-left:4px">${r.sessions} sesi</span></div>
+          <div class="history-card-preview">${esc(prev.slice(0,60))}${prev.length>60?'…':''}</div>
+        </div>
+        <span class="history-card-arrow">▼</span>
+      </div>
+      <div class="history-card-body">
+        ${r.progress    ? `<div class="history-field"><div class="history-field-label">🌱 Progress</div><div class="history-field-val">${esc(r.progress)}</div></div>` : ''}
+        ${r.improvement ? `<div class="history-field"><div class="history-field-label">💪 Needs Improvement</div><div class="history-field-val">${esc(r.improvement)}</div></div>` : ''}
+        ${r.note        ? `<div class="history-field"><div class="history-field-label">📝 Teacher's Note</div><div class="history-field-val">${esc(r.note)}</div></div>` : ''}
+        <div class="history-card-actions">
+          <button class="btn-sm primary" onclick="loadMonthIntoForm('${r.month}','${r.year}')">✏️ Buka & Edit</button>
+          <button class="btn-sm danger"  onclick="deleteMonthlyReport('${sid}','${r.year}','${r.month}')">Hapus</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function loadMonthIntoForm(month, year) {
+  document.getElementById('monthly-bulan').value = month;
+  document.getElementById('monthly-tahun').value = year;
+  loadMonthlyReport();
+  document.getElementById('monthly-form')?.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function deleteMonthlyReport(sid, year, month) {
+  if (!confirm(`Hapus laporan ${month} ${year}?`)) return;
+  localStorage.removeItem(monthlyKey(sid, year, month));
+  renderMonthlyHistory(sid);
+  showToast('Laporan dihapus');
 }
 
 function buildMonthlyMsg() {

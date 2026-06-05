@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Little Hanzi — Laporan Murid</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --teal:        #6ecdc3;
+    --teal-dark:   #46a89e;
+    --teal-light:  #e6f8f7;
+    --paper:       #fef6e7;
+    --cream:       #faebd0;
+    --border:      #e8d8b8;
+    --muted:       #9a8060;
+    --ink:         #3D2E1E;
+    --orange:      #E8A05A;
+    --orange-light:#FFF3E6;
+    --yellow:      #F0C040;
+    --green:       #3CAB8B;
+    --green-light: #e6f8f7;
+    --success:     #2a8a7a;
+    --success-bg:  #e6f8f7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Nunito', sans-serif; background: var(--paper); color: var(--ink); min-height: 100vh; }
+
+  /* Header */
+  header {
+    background: linear-gradient(135deg, #46a89e 0%, #6ecdc3 55%, #8cdad5 100%);
+    padding: 1.25rem 1.5rem 1rem; position: relative; overflow: hidden;
+  }
+  header::before { content:''; position:absolute; top:-20px; right:-20px; width:120px; height:120px; background:rgba(240,192,64,.2); border-radius:50%; }
+  header::after  { content:''; position:absolute; bottom:-30px; left:30%; width:80px; height:80px; background:rgba(237,229,212,.15); border-radius:50%; }
+  .header-inner { display:flex; align-items:center; gap:1rem; position:relative; z-index:1; }
+  .header-logo { width:52px; height:52px; object-fit:contain; flex-shrink:0; border-radius:13px; background:#fff; padding:5px; box-shadow:0 2px 10px rgba(0,0,0,.15); }
+  .header-label { font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:rgba(255,255,255,.75); font-weight:600; margin-bottom:2px; }
+  header h1 { font-size:clamp(16px,4vw,21px); font-weight:800; color:#fff; }
+  header h1 .hanzi { color:var(--yellow); }
+  header p { font-size:11.5px; color:rgba(255,255,255,.7); margin-top:3px; font-weight:500; }
+  .header-dots { position:absolute; right:1rem; bottom:.75rem; display:flex; gap:5px; z-index:1; }
+  .header-dots span { width:7px; height:7px; border-radius:50%; }
+  .d1{background:var(--yellow);} .d2{background:rgba(255,255,255,.6);} .d3{background:#EDE5D4;opacity:.7;} .d4{background:#fff;opacity:.4;}
+
+  main { max-width: 700px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
+
+  /* Loading / Error */
+  .state-box { text-align:center; padding:3rem 1rem; }
+  .state-icon { font-size:48px; margin-bottom:12px; }
+  .state-title { font-size:18px; font-weight:800; margin-bottom:6px; }
+  .state-sub   { font-size:13px; color:var(--muted); }
+  .spinner-wrap { display:flex; flex-direction:column; align-items:center; gap:12px; padding:3rem; }
+  .spinner { width:32px; height:32px; border:3px solid var(--teal-light); border-top-color:var(--teal); border-radius:50%; animation:spin .7s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* Biodata card */
+  .bio-card {
+    background:#fff; border:1.5px solid var(--border); border-radius:18px;
+    padding:1.4rem; margin-bottom:1.25rem; box-shadow:0 2px 8px rgba(61,46,30,.06);
+  }
+  .bio-header { display:flex; align-items:center; gap:14px; margin-bottom:1rem; padding-bottom:.9rem; border-bottom:1.5px solid var(--cream); }
+  .bio-avatar { width:52px; height:52px; border-radius:50%; background:linear-gradient(135deg,var(--teal-light),var(--cream)); color:var(--teal-dark); font-size:16px; font-weight:800; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .bio-name  { font-size:18px; font-weight:800; }
+  .bio-sub   { font-size:12px; color:var(--muted); margin-top:2px; font-weight:500; }
+  .bio-grid  { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .bio-field label { font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); display:block; margin-bottom:2px; }
+  .bio-field span  { font-size:13px; font-weight:600; }
+
+  /* Tabs */
+  .tab-bar { display:flex; background:#fff; border:1.5px solid var(--border); border-radius:14px; padding:4px; gap:4px; margin-bottom:1.25rem; overflow-x:auto; }
+  .tab-bar::-webkit-scrollbar { display:none; }
+  .tab-btn { flex:1; min-width:max-content; padding:9px 10px; border-radius:10px; border:none; background:transparent; font-family:'Nunito',sans-serif; font-size:12px; font-weight:700; color:var(--muted); cursor:pointer; transition:all .15s; white-space:nowrap; }
+  .tab-btn.active { background:var(--teal); color:#fff; }
+
+  .tab-content { display:none; }
+  .tab-content.active { display:block; }
+
+  /* Section card */
+  .section { background:#fff; border:1.5px solid var(--border); border-radius:16px; padding:1.25rem; margin-bottom:1rem; box-shadow:0 2px 6px rgba(61,46,30,.05); }
+  .sec-title { font-size:11px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); margin-bottom:1rem; display:flex; align-items:center; gap:8px; }
+  .sec-title::after { content:''; flex:1; height:1.5px; background:var(--cream); }
+
+  /* Report cards */
+  .report-card { border:1.5px solid var(--border); border-radius:12px; overflow:hidden; margin-bottom:8px; }
+  .report-head { display:flex; align-items:center; justify-content:space-between; padding:11px 14px; cursor:pointer; user-select:none; background:var(--paper); transition:background .15s; }
+  .report-head:hover { background:var(--teal-light); }
+  .report-head-left .date { font-size:13px; font-weight:700; }
+  .report-head-left .prev { font-size:11.5px; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:220px; }
+  .report-arrow { font-size:12px; color:var(--muted); transition:transform .2s; flex-shrink:0; }
+  .report-card.open .report-arrow { transform:rotate(180deg); }
+  .report-body { display:none; padding:12px 14px; border-top:1.5px solid var(--cream); }
+  .report-card.open .report-body { display:block; }
+  .rfield { margin-bottom:10px; }
+  .rfield:last-child { margin-bottom:0; }
+  .rfield-label { font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-bottom:3px; }
+  .rfield-val   { font-size:13px; line-height:1.6; white-space:pre-wrap; }
+
+  /* Monthly badge */
+  .month-badge { background:var(--teal-light); color:var(--teal-dark); border-radius:6px; padding:2px 8px; font-size:10px; font-weight:700; margin-left:6px; }
+  .session-badge { background:var(--cream); color:var(--muted); border-radius:6px; padding:2px 8px; font-size:10px; font-weight:700; margin-left:4px; }
+
+  /* Invoice cards */
+  .inv-card { border:1.5px solid var(--border); border-radius:12px; padding:12px 14px; margin-bottom:8px; background:var(--paper); }
+  .inv-card.lunas { border-color:#A8D5B5; background:#F0FAF4; }
+  .inv-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .inv-title { font-size:14px; font-weight:700; }
+  .inv-status { display:inline-flex; align-items:center; border-radius:6px; padding:3px 10px; font-size:11px; font-weight:700; }
+  .inv-status.lunas { background:var(--success-bg); color:var(--success); }
+  .inv-status.belum { background:var(--orange-light); color:#C07030; }
+  .inv-detail { font-size:12px; color:var(--muted); margin-bottom:4px; }
+  .inv-amount { font-size:20px; font-weight:800; color:var(--teal-dark); }
+  .inv-dates { font-size:11.5px; color:var(--muted); margin-top:6px; }
+
+  /* Bank info */
+  .bank-box { background:var(--teal-light); border:1.5px solid var(--teal); border-radius:10px; padding:12px 14px; font-size:13px; font-weight:600; color:var(--teal-dark); margin-top:1rem; }
+
+  /* Empty */
+  .empty-state { text-align:center; padding:2rem 1rem; color:var(--muted); font-size:13px; font-weight:600; }
+  .empty-state .ei { font-size:32px; margin-bottom:8px; }
+
+  /* Footer */
+  footer { text-align:center; padding:1.5rem; font-size:12px; color:var(--muted); font-weight:600; }
+
+  @media (max-width:480px) {
+    .bio-grid { grid-template-columns:1fr; }
+    .tab-btn  { font-size:11px; padding:8px 8px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <img src="/logo.png" class="header-logo" alt="Little Hanzi"
+      onerror="this.outerHTML='<div style=\'width:52px;height:52px;border-radius:13px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:22px\'>🈳</div>'">
+    <div>
+      <div class="header-label">Portal Orang Tua</div>
+      <h1>Little <span class="hanzi">漢字</span> Hanzi</h1>
+      <p>Melinda's Chinese Learning Studio ✨</p>
+    </div>
+  </div>
+  <div class="header-dots"><span class="d1"></span><span class="d2"></span><span class="d3"></span><span class="d4"></span></div>
+</header>
+
+<main>
+  <!-- Loading state -->
+  <div id="state-loading" class="spinner-wrap">
+    <div class="spinner"></div>
+    <p style="font-size:13px;color:var(--muted);font-weight:600">Memuat laporan...</p>
+  </div>
+
+  <!-- Error state -->
+  <div id="state-error" style="display:none">
+    <div class="state-box">
+      <div class="state-icon">😕</div>
+      <div class="state-title">Halaman Tidak Ditemukan</div>
+      <div class="state-sub">Link ini tidak valid atau murid belum terdaftar.</div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div id="content" style="display:none">
+
+    <!-- Biodata -->
+    <div class="bio-card">
+      <div class="bio-header">
+        <div class="bio-avatar" id="bio-avatar"></div>
+        <div>
+          <div class="bio-name"  id="bio-nama"></div>
+          <div class="bio-sub"   id="bio-sub"></div>
+        </div>
+      </div>
+      <div class="bio-grid">
+        <div class="bio-field"><label>Sekolah</label><span id="bio-school">—</span></div>
+        <div class="bio-field"><label>Kelas / Grade</label><span id="bio-grade">—</span></div>
+        <div class="bio-field"><label>Mulai Les</label><span id="bio-start">—</span></div>
+        <div class="bio-field"><label>Status</label><span style="color:var(--teal-dark);font-weight:700">🟢 Aktif</span></div>
+      </div>
+      <div id="bio-note" style="display:none;margin-top:10px;padding:10px 12px;background:var(--cream);border-radius:10px;font-size:13px;color:var(--muted)"></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="showTab('daily')">📋 Laporan Harian</button>
+      <button class="tab-btn"        onclick="showTab('monthly')">📊 Laporan Bulanan</button>
+      <button class="tab-btn"        onclick="showTab('invoice')">💰 Tagihan</button>
+    </div>
+
+    <!-- Tab: Laporan Harian -->
+    <div class="tab-content active" id="tab-daily">
+      <div id="daily-list"></div>
+    </div>
+
+    <!-- Tab: Laporan Bulanan -->
+    <div class="tab-content" id="tab-monthly">
+      <div id="monthly-list"></div>
+    </div>
+
+    <!-- Tab: Invoice / Tagihan -->
+    <div class="tab-content" id="tab-invoice">
+      <div id="invoice-list"></div>
+      <div class="bank-box" id="bank-box" style="display:none">
+        🏦 Pembayaran ke: <strong>BCA 0697150882</strong> a/n <strong>MELINDA</strong>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<footer>Little Hanzi — Melinda's Chinese Learning Studio ✨</footer>
+
+<script>
+const API = 'https://script.google.com/macros/s/AKfycby0OpOs8nZGqBSbTPq3BxYuYACLG0p9EY65fM8UDgC4rqilwgJLqc-f7km91XNF6U6JQQ/exec';
+const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+
+// Ambil studentId dari URL: /murid/[studentId]
+const studentId = window.location.pathname.split('/').filter(Boolean).pop();
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmt(n) { return (n||0).toLocaleString('id-ID'); }
+function initials(n) { return (n||'?').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase(); }
+
+function showTab(name) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+    if (['daily','monthly','invoice'][i] === name) btn.classList.add('active');
+  });
+}
+
+function toggleCard(id) {
+  document.getElementById(id)?.classList.toggle('open');
+}
+
+async function load() {
+  if (!studentId) { showError(); return; }
+  try {
+    const res = await fetch(`${API}?action=get_student_page&studentId=${encodeURIComponent(studentId)}`);
+    const data = await res.json();
+    if (data.error || !data.murid) { showError(); return; }
+    render(data);
+  } catch(e) { showError(); }
+}
+
+function showError() {
+  document.getElementById('state-loading').style.display = 'none';
+  document.getElementById('state-error').style.display   = 'block';
+}
+
+function render({ murid, daily, monthly, invoices }) {
+  document.getElementById('state-loading').style.display = 'none';
+  document.getElementById('content').style.display       = 'block';
+
+  // Biodata
+  document.getElementById('bio-avatar').textContent = initials(murid.nama);
+  document.getElementById('bio-nama').textContent   = murid.nama;
+  document.getElementById('bio-sub').textContent    = `${murid.school||'—'} · ${murid.grade||'—'}`;
+  document.getElementById('bio-school').textContent = murid.school || '—';
+  document.getElementById('bio-grade').textContent  = murid.grade  || '—';
+  document.getElementById('bio-start').textContent  = murid.start
+    ? new Date(murid.start + 'T00:00:00').toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})
+    : '—';
+  if (murid.note) {
+    const noteEl = document.getElementById('bio-note');
+    noteEl.style.display = 'block';
+    noteEl.textContent   = '📌 ' + murid.note;
+  }
+
+  // Daily reports
+  const dailyEl = document.getElementById('daily-list');
+  if (!daily.length) {
+    dailyEl.innerHTML = '<div class="empty-state"><div class="ei">📭</div>Belum ada laporan harian</div>';
+  } else {
+    dailyEl.innerHTML = daily.map((r, i) => {
+      const d   = new Date(r.date + 'T00:00:00');
+      const tgl = d.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+      const prev = r.topics || r.homework || '—';
+      return `<div class="report-card" id="dc-${i}">
+        <div class="report-head" onclick="toggleCard('dc-${i}')">
+          <div class="report-head-left">
+            <div class="date">📅 ${d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})}</div>
+            <div class="prev">${esc(prev.slice(0,55))}${prev.length>55?'…':''}</div>
+          </div>
+          <span class="report-arrow">▼</span>
+        </div>
+        <div class="report-body">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:10px">${tgl}</div>
+          ${r.topics      ? `<div class="rfield"><div class="rfield-label">📖 Topics Covered</div><div class="rfield-val">${esc(r.topics)}</div></div>` : ''}
+          ${r.homework    ? `<div class="rfield"><div class="rfield-label">✏️ Homework / PR</div><div class="rfield-val">${esc(r.homework)}</div></div>` : ''}
+          ${r.improvement ? `<div class="rfield"><div class="rfield-label">💪 Needs Improvement</div><div class="rfield-val">${esc(r.improvement)}</div></div>` : ''}
+          ${r.note        ? `<div class="rfield"><div class="rfield-label">📝 Teacher's Note</div><div class="rfield-val">${esc(r.note)}</div></div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Monthly reports
+  const monthlyEl = document.getElementById('monthly-list');
+  if (!monthly.length) {
+    monthlyEl.innerHTML = '<div class="empty-state"><div class="ei">📭</div>Belum ada laporan bulanan</div>';
+  } else {
+    monthlyEl.innerHTML = monthly.map((r, i) => {
+      const prev = r.progress || r.note || '—';
+      return `<div class="report-card" id="mc-${i}">
+        <div class="report-head" onclick="toggleCard('mc-${i}')">
+          <div class="report-head-left">
+            <div class="date">📅 ${r.month} ${r.year}</div>
+            <div class="prev">${esc(prev.slice(0,55))}${prev.length>55?'…':''}</div>
+          </div>
+          <span class="report-arrow">▼</span>
+        </div>
+        <div class="report-body">
+          ${r.progress    ? `<div class="rfield"><div class="rfield-label">🌱 Progress</div><div class="rfield-val">${esc(r.progress)}</div></div>` : ''}
+          ${r.improvement ? `<div class="rfield"><div class="rfield-label">💪 Needs Improvement</div><div class="rfield-val">${esc(r.improvement)}</div></div>` : ''}
+          ${r.note        ? `<div class="rfield"><div class="rfield-label">📝 Teacher's Note</div><div class="rfield-val">${esc(r.note)}</div></div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Invoices
+  const invoiceEl = document.getElementById('invoice-list');
+  const hasUnpaid = invoices.some(inv => inv.status !== 'lunas');
+  if (!invoices.length) {
+    invoiceEl.innerHTML = '<div class="empty-state"><div class="ei">📭</div>Belum ada tagihan</div>';
+  } else {
+    document.getElementById('bank-box').style.display = hasUnpaid ? 'block' : 'none';
+    invoiceEl.innerHTML = invoices.map(inv => {
+      const paid = inv.status === 'lunas';
+      const due  = inv.dueDate ? new Date(inv.dueDate+'T00:00:00').toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}) : '—';
+      const pay  = inv.payDate ? new Date(inv.payDate+'T00:00:00').toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}) : null;
+      return `<div class="inv-card${paid?' lunas':''}">
+        <div class="inv-top">
+          <div class="inv-title">${inv.month} ${inv.year}</div>
+          <span class="inv-status ${paid?'lunas':'belum'}">${paid?'✅ Lunas':'⏳ Belum Lunas'}</span>
+        </div>
+        ${inv.invNo   ? `<div class="inv-detail">No. ${esc(inv.invNo)}</div>` : ''}
+        ${inv.details ? `<div class="inv-detail">${esc(inv.details)}</div>` : ''}
+        <div class="inv-amount">Rp ${fmt(inv.amount)}</div>
+        <div class="inv-dates">
+          Jatuh Tempo: ${due}
+          ${pay ? ` &nbsp;·&nbsp; Dibayar: ${pay}` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+
+load();
+</script>
+</body>
+</html>

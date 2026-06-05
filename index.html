@@ -1569,6 +1569,7 @@ function renderStudentList() {
           ${s.note?`<div class="student-card-meta" style="font-style:italic;color:var(--muted)">📌 ${s.note}</div>`:''}
         </div>
         <div class="student-card-actions">
+          <button class="btn-sm" onclick="copyStudentLink('${s.id}','${esc(s.nama)}')" title="Salin link untuk orang tua">🔗 Link</button>
           <button class="btn-sm" onclick="openEdit('${s.id}')">Edit</button>
           <button class="btn-sm danger" onclick="deleteStudent('${s.id}')">Hapus</button>
         </div>
@@ -1598,6 +1599,13 @@ function openWA(wa, msg) {
 function copyText(text) {
   navigator.clipboard.writeText(text)
     .then(()=>showToast('✓ Berhasil disalin'))
+    .catch(()=>showToast('Gagal menyalin'));
+}
+
+function copyStudentLink(id, nama) {
+  const url = `${window.location.origin}/murid/${id}`;
+  navigator.clipboard.writeText(url)
+    .then(()=>showToast(`✓ Link ${nama} disalin`))
     .catch(()=>showToast('Gagal menyalin'));
 }
 

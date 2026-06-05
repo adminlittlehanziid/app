@@ -1602,8 +1602,19 @@ function copyText(text) {
     .catch(()=>showToast('Gagal menyalin'));
 }
 
+function toSlug(name) {
+  return (name||'').toLowerCase()
+    .replace(/[àáâãä]/g,'a').replace(/[èéêë]/g,'e')
+    .replace(/[ìíîï]/g,'i').replace(/[òóôõö]/g,'o')
+    .replace(/[ùúûü]/g,'u')
+    .replace(/\s+/g,'-')
+    .replace(/[^a-z0-9-]/g,'')
+    .replace(/-+/g,'-').replace(/^-|-$/g,'');
+}
+
 function copyStudentLink(id, nama) {
-  const url = `${window.location.origin}/murid/${id}`;
+  const slug = toSlug(nama) || id;
+  const url  = `${window.location.origin}/murid/${slug}`;
   navigator.clipboard.writeText(url)
     .then(()=>showToast(`✓ Link ${nama} disalin`))
     .catch(()=>showToast('Gagal menyalin'));

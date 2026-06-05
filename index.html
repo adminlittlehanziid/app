@@ -299,6 +299,45 @@
   #toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--ink); color: var(--paper); padding: 10px 22px; border-radius: 100px; font-size: 13px; font-weight: 700; pointer-events: none; transition: transform .3s cubic-bezier(.34,1.56,.64,1), opacity .25s; opacity: 0; white-space: nowrap; z-index: 999; }
   #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 
+  /* ── Weekly schedule strip ── */
+  .week-strip { display: flex; flex-direction: column; gap: 5px; margin-bottom: .25rem; }
+  .week-row { display: flex; align-items: flex-start; gap: 8px; padding: 7px 10px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--paper); }
+  .week-row.has-class { background: var(--teal-light); border-color: var(--teal); }
+  .week-row-day { font-size: 11px; font-weight: 800; min-width: 42px; color: var(--muted); text-transform: uppercase; padding-top: 3px; letter-spacing: .04em; flex-shrink: 0; }
+  .week-row.has-class .week-row-day { color: var(--teal-dark); }
+  .week-chips { display: flex; flex-wrap: wrap; gap: 5px; flex: 1; }
+  .week-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--teal); color: #fff; border-radius: 20px; padding: 3px 10px 3px 5px; font-size: 11.5px; font-weight: 700; }
+  .week-chip-av { width: 18px; height: 18px; border-radius: 50%; background: rgba(255,255,255,.25); font-size: 7px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .week-chip-time { font-size: 10px; font-weight: 600; opacity: .8; margin-left: 2px; }
+  .week-row-empty { font-size: 11px; color: var(--muted); padding-top: 3px; font-style: italic; }
+
+  /* ── Day detail panel ── */
+  .day-detail-panel { background: var(--teal-light); border: 1.5px solid var(--teal); border-radius: 12px; padding: 12px 14px; margin-top: 10px; display: none; }
+  .day-detail-panel.open { display: block; }
+  .day-detail-title { font-size: 11px; font-weight: 800; color: var(--teal-dark); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .06em; }
+  .day-detail-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid rgba(110,205,195,.25); }
+  .day-detail-item:last-child { border-bottom: none; }
+  .day-detail-name { flex: 1; font-size: 13px; font-weight: 700; }
+  .day-detail-time { background: rgba(255,255,255,.7); border-radius: 6px; padding: 2px 8px; font-size: 11.5px; font-weight: 700; color: var(--teal-dark); }
+  .day-detail-empty { font-size: 12px; color: var(--muted); text-align: center; padding: 8px; font-style: italic; }
+
+  /* ── Jadwal input per murid ── */
+  .jadwal-input-wrap { display: flex; flex-direction: column; gap: 5px; }
+  .jadwal-day-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 8px; border: 1.5px solid var(--border); transition: background .15s, border-color .15s; cursor: pointer; }
+  .jadwal-day-row.active { background: var(--teal-light); border-color: var(--teal); }
+  .jadwal-day-label { display: flex; align-items: center; gap: 6px; min-width: 82px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+  .jadwal-day-label input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--teal); cursor: pointer; flex-shrink: 0; }
+  input.jadwal-time { width: 90px; padding: 4px 8px; border-radius: 7px; border: 1.5px solid var(--border); font-size: 12px; font-family: 'Nunito', sans-serif; font-weight: 600; color: var(--ink); }
+  input.jadwal-time:focus { outline: none; border-color: var(--teal); }
+  input.jadwal-time:disabled { opacity: .4; cursor: not-allowed; background: var(--cream); }
+  .jadwal-note-hint { font-size: 11px; color: var(--muted); margin-left: auto; padding-top: 2px; }
+
+  /* ── Student dots in calendar ── */
+  .cal-day-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 1px; margin-top: 1px; line-height: 1; }
+  .cal-stu-dot { width: 11px; height: 11px; border-radius: 50%; font-size: 5.5px; font-weight: 800; display: flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0; }
+  .cal-day.selected-day { box-shadow: 0 0 0 2.5px var(--ink) !important; z-index: 2; }
+  .cal-day { min-height: 38px; height: auto; aspect-ratio: unset; }
+
   @media (max-width: 520px) {
     .grid-2 { grid-template-columns: 1fr; }
     .btn-row { grid-template-columns: 1fr; }
@@ -353,6 +392,12 @@
       </select>
     </div>
 
+    <!-- Weekly schedule strip -->
+    <div id="week-strip-wrap" style="margin-bottom:1rem">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">📆 Jadwal Rutin Mingguan</div>
+      <div class="week-strip" id="week-strip-el"></div>
+    </div>
+
     <div class="cal-header">
       <div class="cal-nav">
         <button onclick="jadwalPrev()">‹</button>
@@ -375,12 +420,18 @@
     <div class="cal-weekdays" id="j-weekdays"></div>
     <div class="cal-days"    id="j-days"></div>
 
-    <div class="cal-legend">
+    <!-- Day detail panel (shown when clicking a day in "semua murid" mode) -->
+    <div class="day-detail-panel" id="day-detail-panel">
+      <div class="day-detail-title" id="day-detail-title">Kelas Hari Ini</div>
+      <div id="day-detail-body"></div>
+    </div>
+
+    <div class="cal-legend" style="margin-top:.9rem">
       <div class="cal-legend-item"><div class="cal-legend-dot teaching"></div>Hari Mengajar</div>
       <div class="cal-legend-item"><div class="cal-legend-dot exam"></div>Ada Ujian</div>
       <div class="cal-legend-item"><div class="cal-legend-dot today"></div>Hari Ini</div>
     </div>
-    <p style="font-size:11.5px;color:var(--muted);margin-top:.7rem;font-weight:500;text-align:center;">
+    <p id="jadwal-tip" style="font-size:11.5px;color:var(--muted);margin-top:.7rem;font-weight:500;text-align:center;">
       Pilih murid → klik tanggal untuk catat sesi mengajar ✓
     </p>
   </div>
@@ -618,6 +669,12 @@
         <label>Note (Catatan)</label>
         <textarea id="f-note" placeholder="Catatan khusus tentang murid..." style="min-height:60px"></textarea>
       </div>
+      <div style="margin-bottom:14px">
+        <label style="font-weight:700;font-size:13px;display:block;margin-bottom:8px">📅 Jadwal Les Rutin</label>
+        <div class="jadwal-input-wrap" id="f-jadwal-wrap">
+          <!-- rendered by renderJadwalInputs('f') -->
+        </div>
+      </div>
       <div style="display:flex;gap:8px">
         <button class="btn-sm primary" id="btn-save-murid" onclick="saveStudent()">Simpan</button>
         <button class="btn-sm" onclick="toggleAddForm()">Batal</button>
@@ -649,7 +706,13 @@
       <div class="field"><label>Fee/Pertemuan</label><input id="e-fee" type="number" min="0"></div>
       <div class="field"><label>No. WA Orang Tua</label><input id="e-wa" type="tel"></div>
     </div>
-    <div class="field" style="margin-bottom:16px"><label>Note</label><textarea id="e-note" style="min-height:60px"></textarea></div>
+    <div class="field" style="margin-bottom:12px"><label>Note</label><textarea id="e-note" style="min-height:60px"></textarea></div>
+    <div style="margin-bottom:16px">
+      <label style="font-weight:700;font-size:13px;display:block;margin-bottom:8px">📅 Jadwal Les Rutin</label>
+      <div class="jadwal-input-wrap" id="e-jadwal-wrap">
+        <!-- rendered by renderJadwalInputs('e') -->
+      </div>
+    </div>
     <div style="display:flex;gap:8px">
       <button class="btn-sm primary" onclick="saveEdit()">Simpan</button>
       <button class="btn-sm" onclick="closeEdit()">Batal</button>
@@ -800,6 +863,7 @@ function init() {
 
   refreshAllSelects();
   renderStudentList();
+  renderJadwalInputs('f', {});
   renderJadwal();
   renderExamList();
   // Sync dari Google Sheets di background
@@ -843,6 +907,9 @@ const getSelStu = selId => getStu(document.getElementById(selId).value);
 // JADWAL CALENDAR
 // ══════════════════════════════════════════════════
 
+const WDAYS_FULL = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+const STU_COLORS = ['#46a89e','#E8A05A','#9B7DC8','#E05252','#3A9FD5','#6BAF6B','#C0637A','#B87A30'];
+
 function jadwalPrev() { if (--jadwalMonth < 0) { jadwalMonth=11; jadwalYear--; } renderJadwal(); }
 function jadwalNext() { if (++jadwalMonth > 11) { jadwalMonth=0; jadwalYear++; } renderJadwal(); }
 
@@ -855,7 +922,16 @@ function renderJadwal() {
 
   document.getElementById('jadwal-label').textContent = `${mn} ${y}`;
 
-  // Teaching days
+  // Update tip text & day detail
+  const tip = document.getElementById('jadwal-tip');
+  if (sid) {
+    tip.textContent = 'Klik tanggal untuk catat / hapus sesi mengajar ✓';
+    document.getElementById('day-detail-panel').classList.remove('open');
+  } else {
+    tip.textContent = 'Klik tanggal untuk lihat kelas hari itu 👆';
+  }
+
+  // Teaching days (for absensi count)
   let teachDays = [];
   if (sid) {
     teachDays = getAbs(sid, y, mn);
@@ -878,11 +954,16 @@ function renderJadwal() {
     }
   });
 
-  // Weekdays
+  // Build student color map
+  const sorted = [...students].sort((a,b)=>a.nama.localeCompare(b.nama));
+  const stuColorMap = {};
+  sorted.forEach((s, i) => { stuColorMap[s.id] = STU_COLORS[i % STU_COLORS.length]; });
+
+  // Weekdays header
   document.getElementById('j-weekdays').innerHTML = WDAYS.map(d=>`<div class="cal-weekday">${d}</div>`).join('');
 
-  const firstDay     = new Date(y, m, 1).getDay();
-  const daysInMonth  = new Date(y, m+1, 0).getDate();
+  const firstDay    = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m+1, 0).getDate();
   let html = '';
 
   for (let i = 0; i < firstDay; i++) html += '<div class="cal-day empty"></div>';
@@ -893,15 +974,131 @@ function renderJadwal() {
     const isToday  = now.getFullYear()===y && now.getMonth()===m && now.getDate()===d;
     const dow      = (firstDay + d - 1) % 7;
     const isWknd   = dow===0 || dow===6;
-    const cls      = ['cal-day', isTeach?'teaching':'', hasExam?'has-exam':'', isToday?'today':'', isWknd?'weekend':''].filter(Boolean).join(' ');
-    const dot      = hasExam ? `<div class="exam-dot" title="${examDays[d].join(', ')}"></div>` : '';
-    const click    = sid ? `onclick="toggleJadwalDay(${d})"` : `title="Pilih murid untuk catat absensi"`;
-    html += `<div class="${cls}" ${click}>${d}${dot}</div>`;
+
+    let dotsHtml = '';
+    let clickAttr = '';
+
+    if (sid) {
+      // Per-student mode: toggle attendance on click
+      clickAttr = `onclick="toggleJadwalDay(${d})"`;
+    } else {
+      // All-students mode: show student dots, click shows detail
+      const scheduled = students.filter(s => {
+        const j = s.jadwal || {};
+        return j[String(dow)] && j[String(dow)].trim() !== '';
+      });
+      if (scheduled.length) {
+        const dots = scheduled.slice(0, 4).map(s =>
+          `<div class="cal-stu-dot" style="background:${stuColorMap[s.id]}" title="${s.nama}">${initials(s.nama)}</div>`
+        ).join('');
+        const extra = scheduled.length > 4 ? `<div class="cal-stu-dot" style="background:#888;font-size:5px">+${scheduled.length-4}</div>` : '';
+        dotsHtml = `<div class="cal-day-dots">${dots}${extra}</div>`;
+      }
+      clickAttr = `onclick="showDayDetail(${d}, ${dow})"`;
+    }
+
+    const cls = ['cal-day', isTeach?'teaching':'', hasExam?'has-exam':'', isToday?'today':'', isWknd?'weekend':''].filter(Boolean).join(' ');
+    const examDot = hasExam ? `<div class="exam-dot" title="${examDays[d].join(', ')}"></div>` : '';
+    html += `<div class="${cls}" ${clickAttr} data-d="${d}" data-dow="${dow}">${d}${dotsHtml}${examDot}</div>`;
   }
 
   document.getElementById('j-days').innerHTML = html;
   document.getElementById('j-sesi').textContent  = teachDays.length;
   document.getElementById('j-ujian').textContent = Object.keys(examDays).length;
+
+  // Render weekly schedule strip
+  renderWeeklySchedule(sid);
+}
+
+function showDayDetail(d, dow) {
+  const y  = jadwalYear;
+  const mn = MONTHS[jadwalMonth];
+  const m  = jadwalMonth;
+  const dateStr = `${d} ${mn} ${y}`;
+  const dayName = WDAYS_FULL[dow];
+
+  // Highlight selected day
+  document.querySelectorAll('.cal-day').forEach(el => el.classList.remove('selected-day'));
+  document.querySelectorAll(`.cal-day[data-d="${d}"]`).forEach(el => el.classList.add('selected-day'));
+
+  const panel     = document.getElementById('day-detail-panel');
+  const titleEl   = document.getElementById('day-detail-title');
+  const bodyEl    = document.getElementById('day-detail-body');
+
+  // Students with recurring schedule on this DOW
+  const scheduled = students.filter(s => {
+    const j = s.jadwal || {};
+    return j[String(dow)] && j[String(dow)].trim() !== '';
+  }).sort((a,b) => {
+    const ta = (a.jadwal||{})[String(dow)] || '99:99';
+    const tb = (b.jadwal||{})[String(dow)] || '99:99';
+    return ta.localeCompare(tb);
+  });
+
+  // Students with attendance marked today
+  const attended = students.filter(s => getAbs(s.id, y, mn).includes(d));
+
+  titleEl.textContent = `${dayName}, ${dateStr}`;
+  if (!scheduled.length && !attended.length) {
+    bodyEl.innerHTML = '<div class="day-detail-empty">Tidak ada kelas terjadwal hari ini</div>';
+  } else {
+    const rows = [];
+    // Show scheduled students
+    scheduled.forEach(s => {
+      const time = (s.jadwal||{})[String(dow)] || '';
+      const didAttend = attended.find(a => a.id === s.id);
+      rows.push(`<div class="day-detail-item">
+        <div class="day-detail-name">${esc(s.nama)}</div>
+        ${time ? `<div class="day-detail-time">🕐 ${time}</div>` : ''}
+        ${didAttend ? '<div style="font-size:11px;color:var(--success);font-weight:700">✓ Hadir</div>' : ''}
+      </div>`);
+    });
+    // Students who attended but not in recurring schedule
+    attended.filter(a => !scheduled.find(s=>s.id===a.id)).forEach(s => {
+      rows.push(`<div class="day-detail-item">
+        <div class="day-detail-name">${esc(s.nama)}</div>
+        <div style="font-size:11px;color:var(--success);font-weight:700">✓ Hadir</div>
+      </div>`);
+    });
+    bodyEl.innerHTML = rows.join('');
+  }
+  panel.classList.add('open');
+}
+
+function renderWeeklySchedule(sid) {
+  const el = document.getElementById('week-strip-el');
+  if (!el) return;
+  // 1=Sen, 2=Sel, 3=Rab, 4=Kam, 5=Jum, 6=Sab, 0=Min
+  const order = [1,2,3,4,5,6,0];
+
+  const targetStudents = sid ? students.filter(s => s.id === sid) : students;
+
+  const rows = order.map(dow => {
+    const dayName = WDAYS_FULL[dow].slice(0, 3).toUpperCase();
+    const studs = targetStudents
+      .filter(s => { const j = s.jadwal||{}; return j[String(dow)] && j[String(dow)].trim(); })
+      .sort((a,b) => {
+        const ta = (a.jadwal||{})[String(dow)] || '99:99';
+        const tb = (b.jadwal||{})[String(dow)] || '99:99';
+        return ta.localeCompare(tb);
+      });
+    const hasClass = studs.length > 0;
+    const chips = studs.map(s => {
+      const time = (s.jadwal||{})[String(dow)] || '';
+      return `<div class="week-chip">
+        <div class="week-chip-av">${initials(s.nama)}</div>
+        ${esc(s.nama.split(' ')[0])}
+        ${time ? `<span class="week-chip-time">${time}</span>` : ''}
+      </div>`;
+    }).join('');
+    return `<div class="week-row${hasClass?' has-class':''}">
+      <div class="week-row-day">${dayName}</div>
+      ${hasClass
+        ? `<div class="week-chips">${chips}</div>`
+        : `<div class="week-row-empty">Tidak ada kelas</div>`}
+    </div>`;
+  });
+  el.innerHTML = rows.join('');
 }
 
 function toggleJadwalDay(day) {
@@ -913,6 +1110,57 @@ function toggleJadwalDay(day) {
   // Sync ke Sheets
   const days = getAbs(sid, jadwalYear, mn);
   apiPost({ action: 'set_absensi', studentId: sid, year: jadwalYear, month: mn, days }).catch(console.warn);
+}
+
+// ── Jadwal Les Rutin input helpers ──────────────────
+const JADWAL_DAYS = [
+  { dow: 1, label: 'Senin' },
+  { dow: 2, label: 'Selasa' },
+  { dow: 3, label: 'Rabu' },
+  { dow: 4, label: 'Kamis' },
+  { dow: 5, label: 'Jumat' },
+  { dow: 6, label: 'Sabtu' },
+  { dow: 0, label: 'Minggu' },
+];
+
+function renderJadwalInputs(prefix, jadwal) {
+  const wrap = document.getElementById(`${prefix}-jadwal-wrap`);
+  if (!wrap) return;
+  wrap.innerHTML = JADWAL_DAYS.map(({ dow, label }) => {
+    const time = jadwal ? (jadwal[String(dow)] || '') : '';
+    const checked = time !== '';
+    return `<div class="jadwal-day-row${checked?' active':''}" id="${prefix}-jrow-${dow}">
+      <label class="jadwal-day-label">
+        <input type="checkbox" id="${prefix}-jc-${dow}" ${checked?'checked':''} onchange="toggleJadwalRow('${prefix}',${dow})">
+        ${label}
+      </label>
+      <input type="time" id="${prefix}-jt-${dow}" class="jadwal-time" value="${esc(time)}" ${checked?'':'disabled'}>
+    </div>`;
+  }).join('');
+}
+
+function toggleJadwalRow(prefix, dow) {
+  const cb  = document.getElementById(`${prefix}-jc-${dow}`);
+  const inp = document.getElementById(`${prefix}-jt-${dow}`);
+  const row = document.getElementById(`${prefix}-jrow-${dow}`);
+  if (!cb || !inp) return;
+  const checked = cb.checked; // onchange fires after state update → correct value
+  inp.disabled = !checked;
+  row.classList.toggle('active', checked);
+  if (!checked) inp.value = '';
+  else { inp.focus(); inp.select(); }
+}
+
+function readJadwalInputs(prefix) {
+  const jadwal = {};
+  JADWAL_DAYS.forEach(({ dow }) => {
+    const cb  = document.getElementById(`${prefix}-jc-${dow}`);
+    const inp = document.getElementById(`${prefix}-jt-${dow}`);
+    if (cb && cb.checked && inp && inp.value) {
+      jadwal[String(dow)] = inp.value;
+    }
+  });
+  return jadwal;
 }
 
 // ══════════════════════════════════════════════════
@@ -1486,6 +1734,7 @@ function toggleAddForm() {
   if (f.classList.contains('open')) {
     ['f-nama','f-sekolah','f-grade','f-fee','f-wa','f-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     document.getElementById('f-start').value='';
+    renderJadwalInputs('f', {});
     document.getElementById('f-nama').focus();
   }
 }
@@ -1499,7 +1748,8 @@ function saveStudent() {
   const fee    = parseInt(document.getElementById('f-fee').value)||0;
   const wa     = document.getElementById('f-wa').value.trim();
   const note   = document.getElementById('f-note').value.trim();
-  const s = { id: Date.now().toString(), nama, school, grade, start, fee, wa, note };
+  const jadwal = readJadwalInputs('f');
+  const s = { id: Date.now().toString(), nama, school, grade, start, fee, wa, note, jadwal };
   students.push(s);
   saveStudents();
   toggleAddForm();
@@ -1528,6 +1778,7 @@ function openEdit(id) {
   document.getElementById('e-fee').value     = s.fee||'';
   document.getElementById('e-wa').value      = s.wa||'';
   document.getElementById('e-note').value    = s.note||'';
+  renderJadwalInputs('e', s.jadwal||{});
   document.getElementById('edit-overlay').classList.add('open');
 }
 function closeEdit() { document.getElementById('edit-overlay').classList.remove('open'); }
@@ -1538,17 +1789,28 @@ function saveEdit() {
   if (!nama) { showToast('⚠ Nama wajib diisi'); return; }
   students = students.map(s => s.id!==id ? s : {
     ...s, nama,
-    school: document.getElementById('e-sekolah').value.trim(),
-    grade:  document.getElementById('e-grade').value.trim(),
-    start:  document.getElementById('e-start').value,
-    fee:    parseInt(document.getElementById('e-fee').value)||0,
-    wa:     document.getElementById('e-wa').value.trim(),
-    note:   document.getElementById('e-note').value.trim()
+    school:  document.getElementById('e-sekolah').value.trim(),
+    grade:   document.getElementById('e-grade').value.trim(),
+    start:   document.getElementById('e-start').value,
+    fee:     parseInt(document.getElementById('e-fee').value)||0,
+    wa:      document.getElementById('e-wa').value.trim(),
+    note:    document.getElementById('e-note').value.trim(),
+    jadwal:  readJadwalInputs('e')
   });
   saveStudents(); closeEdit(); renderStudentList(); refreshAllSelects();
   showToast(`✓ Data ${nama} diperbarui`);
   const updated = students.find(s => s.id === id);
   if (updated) apiPost({ action: 'update_murid', ...updated }).catch(console.warn);
+}
+
+function buildJadwalBadge(jadwal) {
+  if (!jadwal) return '';
+  const order = [1,2,3,4,5,6,0];
+  const parts = order
+    .filter(dow => jadwal[String(dow)] && jadwal[String(dow)].trim())
+    .map(dow => `${WDAYS_FULL[dow].slice(0,3)} ${jadwal[String(dow)]}`);
+  if (!parts.length) return '';
+  return `<div class="student-card-meta" style="color:var(--teal-dark)">📅 ${parts.join(' · ')}</div>`;
 }
 
 function renderStudentList() {
@@ -1567,6 +1829,7 @@ function renderStudentList() {
           <div class="student-card-meta">📅 Start: ${started} · 💵 Rp ${fmt(s.fee||0)}/sesi</div>
           ${s.wa?`<div class="student-card-meta">📱 ${s.wa}</div>`:''}
           ${s.note?`<div class="student-card-meta" style="font-style:italic;color:var(--muted)">📌 ${s.note}</div>`:''}
+          ${buildJadwalBadge(s.jadwal)}
         </div>
         <div class="student-card-actions">
           <button class="btn-sm" onclick="copyStudentLink('${s.id}','${esc(s.nama)}')" title="Salin link untuk orang tua">🔗 Link</button>

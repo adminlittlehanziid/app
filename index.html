@@ -1136,15 +1136,16 @@ function showStudentDayEdit(d, dow) {
   document.querySelectorAll('.cal-day').forEach(el => el.classList.remove('selected-day'));
   document.querySelectorAll(`.cal-day[data-d="${d}"]`).forEach(el => el.classList.add('selected-day'));
 
-  const isHadir   = getAbs(sid, y, mn).includes(d);
-  const savedTime = getAbsTime(sid, y, mn, d);
-  // Pre-fill from recurring schedule if nothing saved yet
+  const hadSession  = getAbs(sid, y, mn).includes(d);
+  const savedTime   = getAbsTime(sid, y, mn, d);
   const defaultTime = (s?.jadwal||{})[String(dow)] || '';
-  const fillTime  = savedTime || defaultTime;
-  const dur       = (s?.jadwalDur||{})[String(dow)] || '';
-  const endT      = addMinutes(fillTime, dur);
-  const durInfo   = dur ? ` · ${durLabel(dur)}${endT?' s/d '+endT:''}` : '';
+  const fillTime    = savedTime || defaultTime;
+  const dur         = (s?.jadwalDur||{})[String(dow)] || '';
+  const endT        = addMinutes(fillTime, dur);
+  const durInfo     = dur ? ` · ${durLabel(dur)}${endT?' s/d '+endT:''}` : '';
 
+  // Default checkbox = CHECKED (klik tanggal = niat tambah sesi)
+  // Uncheck manual kalau mau hapus
   const panel   = document.getElementById('day-detail-panel');
   const titleEl = document.getElementById('day-detail-title');
   const bodyEl  = document.getElementById('day-detail-body');
@@ -1154,7 +1155,7 @@ function showStudentDayEdit(d, dow) {
     <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(110,205,195,.25)">
       <span style="font-size:13px;font-weight:700;flex:1">Status Kehadiran</span>
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;cursor:pointer">
-        <input type="checkbox" id="dp-hadir" ${isHadir?'checked':''} style="width:16px;height:16px;accent-color:var(--teal)">
+        <input type="checkbox" id="dp-hadir" checked style="width:16px;height:16px;accent-color:var(--teal)">
         Hadir
       </label>
     </div>
@@ -1165,7 +1166,7 @@ function showStudentDayEdit(d, dow) {
     ${dur ? `<div style="font-size:11px;color:var(--teal-dark);padding:6px 0 2px;font-weight:600">Jadwal rutin: ${defaultTime}${durInfo}</div>` : ''}
     <div style="margin-top:10px;display:flex;gap:8px">
       <button class="btn-sm primary" onclick="saveDayEdit(${d}, ${dow})">✓ Simpan</button>
-      <button class="btn-sm" onclick="clearDayEdit(${d})">Hapus Sesi</button>
+      ${hadSession ? `<button class="btn-sm danger" onclick="clearDayEdit(${d})">🗑 Hapus Sesi</button>` : ''}
     </div>`;
   panel.classList.add('open');
 }
@@ -1175,23 +1176,24 @@ function saveDayEdit(d, dow) {
   if (!sid) return;
   const mn      = MONTHS[jadwalMonth];
   const y       = jadwalYear;
-  const isHadir = document.getElementById('dp-hadir')?.checked;
+  const hadir   = document.getElementById('dp-hadir')?.checked;
   const time    = document.getElementById('dp-time')?.value || '';
 
   // Update attendance
   let days = getAbs(sid, y, mn);
-  if (isHadir && !days.includes(d)) days = [...days, d].sort((a,b)=>a-b);
-  if (!isHadir) days = days.filter(x => x !== d);
+  const wasThere = days.includes(d);
+  if (hadir  && !wasThere) days = [...days, d].sort((a,b)=>a-b);
+  if (!hadir && wasThere)  days = days.filter(x => x !== d);
   setAbs(sid, y, mn, days);
-
-  // Save actual session time
-  setAbsTime(sid, y, mn, d, isHadir ? time : '');
+  setAbsTime(sid, y, mn, d, hadir ? time : '');
 
   renderJadwal();
   document.getElementById('day-detail-panel').classList.remove('open');
-  showToast(isHadir ? `✓ Sesi ${d} ${mn} — ${time||'jam tidak diisi'}` : 'Sesi dihapus');
 
-  // Sync to Sheets
+  if (hadir)              showToast(`✓ Sesi ${d} ${mn}${time?' — '+time:''} tersimpan`);
+  else if (wasThere)      showToast(`Sesi ${d} ${mn} dihapus`);
+  else                    showToast('Tidak ada perubahan');
+
   apiPost({ action: 'set_absensi', studentId: sid, year: y, month: mn, days }).catch(console.warn);
 }
 

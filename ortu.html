@@ -136,7 +136,7 @@
       onerror="this.outerHTML='<div style=\'width:52px;height:52px;border-radius:13px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:22px\'>🈳</div>'">
     <div>
       <div class="header-label">Portal Orang Tua</div>
-      <h1>Little <span class="hanzi">漢字</span> Hanzi</h1>
+      <h1>Little <span class="hanzi">汉字</span> Hanzi</h1>
       <p>Melinda's Chinese Learning Studio ✨</p>
     </div>
   </div>
@@ -221,6 +221,27 @@ function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').repl
 function fmt(n) { return (n||0).toLocaleString('id-ID'); }
 function initials(n) { return (n||'?').split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase(); }
 
+// Robust date parser — handles yyyy-MM-dd, dd/MM/yyyy, and ISO strings
+function parseDate(str) {
+  if (!str) return null;
+  const s = String(str).trim();
+  if (!s) return null;
+  // yyyy-MM-dd
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s + 'T00:00:00');
+  // dd/MM/yyyy
+  const p = s.split('/');
+  if (p.length === 3 && p[2].length === 4)
+    return new Date(`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}T00:00:00`);
+  // fallback
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+function fmtDate(str, opts) {
+  const d = parseDate(str);
+  if (!d) return '—';
+  return d.toLocaleDateString('id-ID', opts);
+}
+
 function showTab(name) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -259,9 +280,8 @@ function render({ murid, daily, monthly, invoices }) {
   document.getElementById('bio-sub').textContent    = `${murid.school||'—'} · ${murid.grade||'—'}`;
   document.getElementById('bio-school').textContent = murid.school || '—';
   document.getElementById('bio-grade').textContent  = murid.grade  || '—';
-  document.getElementById('bio-start').textContent  = murid.start
-    ? new Date(murid.start + 'T00:00:00').toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})
-    : '—';
+  document.getElementById('bio-start').textContent  =
+    fmtDate(murid.start, {day:'numeric',month:'long',year:'numeric'});
   if (murid.note) {
     const noteEl = document.getElementById('bio-note');
     noteEl.style.display = 'block';
@@ -274,19 +294,19 @@ function render({ murid, daily, monthly, invoices }) {
     dailyEl.innerHTML = '<div class="empty-state"><div class="ei">📭</div>Belum ada laporan harian</div>';
   } else {
     dailyEl.innerHTML = daily.map((r, i) => {
-      const d   = new Date(r.date + 'T00:00:00');
-      const tgl = d.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+      const tgl  = fmtDate(r.date, {weekday:'long',day:'numeric',month:'long',year:'numeric'});
+      const tgl2 = fmtDate(r.date, {day:'numeric',month:'short',year:'numeric'});
       const prev = r.topics || r.homework || '—';
       return `<div class="report-card" id="dc-${i}">
         <div class="report-head" onclick="toggleCard('dc-${i}')">
           <div class="report-head-left">
-            <div class="date">📅 ${d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})}</div>
+            <div class="date">📅 ${tgl2}</div>
             <div class="prev">${esc(prev.slice(0,55))}${prev.length>55?'…':''}</div>
           </div>
           <span class="report-arrow">▼</span>
         </div>
         <div class="report-body">
-          <div style="font-size:11px;color:var(--muted);margin-bottom:10px">${tgl}</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:10px">${tgl === '—' ? '' : tgl}</div>
           ${r.topics      ? `<div class="rfield"><div class="rfield-label">📖 Topics Covered</div><div class="rfield-val">${esc(r.topics)}</div></div>` : ''}
           ${r.homework    ? `<div class="rfield"><div class="rfield-label">✏️ Homework / PR</div><div class="rfield-val">${esc(r.homework)}</div></div>` : ''}
           ${r.improvement ? `<div class="rfield"><div class="rfield-label">💪 Needs Improvement</div><div class="rfield-val">${esc(r.improvement)}</div></div>` : ''}
@@ -329,8 +349,8 @@ function render({ murid, daily, monthly, invoices }) {
     document.getElementById('bank-box').style.display = hasUnpaid ? 'block' : 'none';
     invoiceEl.innerHTML = invoices.map(inv => {
       const paid = inv.status === 'lunas';
-      const due  = inv.dueDate ? new Date(inv.dueDate+'T00:00:00').toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}) : '—';
-      const pay  = inv.payDate ? new Date(inv.payDate+'T00:00:00').toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}) : null;
+      const due  = fmtDate(inv.dueDate, {day:'numeric',month:'long',year:'numeric'});
+      const pay  = inv.payDate ? fmtDate(inv.payDate, {day:'numeric',month:'long',year:'numeric'}) : null;
       return `<div class="inv-card${paid?' lunas':''}">
         <div class="inv-top">
           <div class="inv-title">${inv.month} ${inv.year}</div>

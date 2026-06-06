@@ -327,10 +327,13 @@
   .jadwal-day-row.active { background: var(--teal-light); border-color: var(--teal); }
   .jadwal-day-label { display: flex; align-items: center; gap: 6px; min-width: 82px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
   .jadwal-day-label input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--teal); cursor: pointer; flex-shrink: 0; }
-  input.jadwal-time { width: 90px; padding: 4px 8px; border-radius: 7px; border: 1.5px solid var(--border); font-size: 12px; font-family: 'Nunito', sans-serif; font-weight: 600; color: var(--ink); }
+  input.jadwal-time { width: 86px; padding: 4px 8px; border-radius: 7px; border: 1.5px solid var(--border); font-size: 12px; font-family: 'Nunito', sans-serif; font-weight: 600; color: var(--ink); }
   input.jadwal-time:focus { outline: none; border-color: var(--teal); }
   input.jadwal-time:disabled { opacity: .4; cursor: not-allowed; background: var(--cream); }
-  .jadwal-note-hint { font-size: 11px; color: var(--muted); margin-left: auto; padding-top: 2px; }
+  select.jadwal-dur { width: 86px; padding: 4px 8px; border-radius: 7px; border: 1.5px solid var(--border); font-size: 11.5px; font-family: 'Nunito', sans-serif; font-weight: 600; color: var(--ink); background: #fff; }
+  select.jadwal-dur:disabled { opacity: .4; cursor: not-allowed; background: var(--cream); }
+  select.jadwal-dur:focus { outline: none; border-color: var(--teal); }
+  .jadwal-end-time { font-size: 10.5px; color: var(--teal-dark); font-weight: 700; white-space: nowrap; }
 
   /* ── Student dots in calendar ── */
   .cal-day-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 1px; margin-top: 1px; line-height: 1; }
@@ -803,9 +806,12 @@ function loadStudents() { students = lsGet('lh_students', []); }
 function saveStudents() { lsSet('lh_students', students); }
 
 // Absensi/jadwal (teaching days)
-const absKey  = (sid, y, m) => `lh_abs_${sid}_${y}_${m}`;
-const getAbs  = (sid, y, m) => lsGet(absKey(sid, y, m), []);
-const setAbs  = (sid, y, m, days) => lsSet(absKey(sid, y, m), days);
+const absKey     = (sid, y, m) => `lh_abs_${sid}_${y}_${m}`;
+const getAbs     = (sid, y, m) => lsGet(absKey(sid, y, m), []);
+const setAbs     = (sid, y, m, days) => lsSet(absKey(sid, y, m), days);
+const absTimeKey = (sid, y, mn, d) => `lh_abstime_${sid}_${y}_${mn}_${d}`;
+const getAbsTime = (sid, y, mn, d) => lsGet(absTimeKey(sid, y, mn, d), '');
+const setAbsTime = (sid, y, mn, d, t) => lsSet(absTimeKey(sid, y, mn, d), t||'');
 function toggleAbs(sid, y, m, day) {
   let days = getAbs(sid, y, m);
   days = days.includes(day) ? days.filter(d => d !== day) : [...days, day].sort((a,b)=>a-b);
@@ -863,7 +869,7 @@ function init() {
 
   refreshAllSelects();
   renderStudentList();
-  renderJadwalInputs('f', {});
+  renderJadwalInputs('f', {}, {});
   renderJadwal();
   renderExamList();
   // Sync dari Google Sheets di background
@@ -925,7 +931,7 @@ function renderJadwal() {
   // Update tip text & day detail
   const tip = document.getElementById('jadwal-tip');
   if (sid) {
-    tip.textContent = 'Klik tanggal untuk catat / hapus sesi mengajar ✓';
+    tip.textContent = 'Klik tanggal untuk catat kehadiran & jam kelas 📝';
     document.getElementById('day-detail-panel').classList.remove('open');
   } else {
     tip.textContent = 'Klik tanggal untuk lihat kelas hari itu 👆';
@@ -979,8 +985,12 @@ function renderJadwal() {
     let clickAttr = '';
 
     if (sid) {
-      // Per-student mode: toggle attendance on click
-      clickAttr = `onclick="toggleJadwalDay(${d})"`;
+      // Per-student mode: open edit panel on click
+      const actualTime = getAbsTime(sid, y, mn, d);
+      if (isTeach && actualTime) {
+        dotsHtml = `<div style="font-size:8px;font-weight:800;color:rgba(255,255,255,.9);line-height:1">${actualTime}</div>`;
+      }
+      clickAttr = `onclick="showStudentDayEdit(${d}, ${dow})"`;
     } else {
       // All-students mode: show student dots, click shows detail
       const scheduled = students.filter(s => {
@@ -1035,8 +1045,10 @@ function showDayDetail(d, dow) {
     return ta.localeCompare(tb);
   });
 
-  // Students with attendance marked today
-  const attended = students.filter(s => getAbs(s.id, y, mn).includes(d));
+  // Students with attendance marked today (with their actual recorded time)
+  const attended = students
+    .filter(s => getAbs(s.id, y, mn).includes(d))
+    .map(s => ({ ...s, actualTime: getAbsTime(s.id, y, mn, d) }));
 
   titleEl.textContent = `${dayName}, ${dateStr}`;
   if (!scheduled.length && !attended.length) {
@@ -1045,19 +1057,25 @@ function showDayDetail(d, dow) {
     const rows = [];
     // Show scheduled students
     scheduled.forEach(s => {
-      const time = (s.jadwal||{})[String(dow)] || '';
+      const time = (s.jadwal||{})[String(dow)]    || '';
+      const dur  = (s.jadwalDur||{})[String(dow)] || '';
+      const endT = addMinutes(time, dur);
       const didAttend = attended.find(a => a.id === s.id);
+      const timeLabel = time ? (endT ? `${time} – ${endT}` : time) : '';
+      const durBadge  = dur ? `<span style="font-size:10.5px;color:var(--muted);margin-left:4px">(${durLabel(dur)})</span>` : '';
       rows.push(`<div class="day-detail-item">
         <div class="day-detail-name">${esc(s.nama)}</div>
-        ${time ? `<div class="day-detail-time">🕐 ${time}</div>` : ''}
-        ${didAttend ? '<div style="font-size:11px;color:var(--success);font-weight:700">✓ Hadir</div>' : ''}
+        ${timeLabel ? `<div class="day-detail-time">🕐 ${timeLabel}${durBadge}</div>` : ''}
+        ${didAttend
+          ? `<div style="font-size:11px;color:var(--success);font-weight:700;flex-shrink:0">✓${didAttend.actualTime?' '+didAttend.actualTime:''}</div>`
+          : ''}
       </div>`);
     });
     // Students who attended but not in recurring schedule
     attended.filter(a => !scheduled.find(s=>s.id===a.id)).forEach(s => {
       rows.push(`<div class="day-detail-item">
         <div class="day-detail-name">${esc(s.nama)}</div>
-        <div style="font-size:11px;color:var(--success);font-weight:700">✓ Hadir</div>
+        <div class="day-detail-time" style="color:var(--success)">✓ Hadir${s.actualTime?' · '+s.actualTime:''}</div>
       </div>`);
     });
     bodyEl.innerHTML = rows.join('');
@@ -1084,11 +1102,15 @@ function renderWeeklySchedule(sid) {
       });
     const hasClass = studs.length > 0;
     const chips = studs.map(s => {
-      const time = (s.jadwal||{})[String(dow)] || '';
+      const time = (s.jadwal||{})[String(dow)]    || '';
+      const dur  = (s.jadwalDur||{})[String(dow)] || '';
+      const endT = addMinutes(time, dur);
+      const timeStr = time ? (endT ? `${time}–${endT}` : time) : '';
+      const durStr  = dur ? ` (${durLabel(dur)})` : '';
       return `<div class="week-chip">
         <div class="week-chip-av">${initials(s.nama)}</div>
         ${esc(s.nama.split(' ')[0])}
-        ${time ? `<span class="week-chip-time">${time}</span>` : ''}
+        ${timeStr ? `<span class="week-chip-time">${timeStr}${durStr}</span>` : ''}
       </div>`;
     }).join('');
     return `<div class="week-row${hasClass?' has-class':''}">
@@ -1101,15 +1123,90 @@ function renderWeeklySchedule(sid) {
   el.innerHTML = rows.join('');
 }
 
-function toggleJadwalDay(day) {
+function showStudentDayEdit(d, dow) {
   const sid = document.getElementById('jadwal-murid').value;
-  if (!sid) { showToast('Pilih murid dulu untuk catat sesi'); return; }
-  const mn  = MONTHS[jadwalMonth];
-  toggleAbs(sid, jadwalYear, mn, day);
+  if (!sid) return;
+  const s  = getStu(sid);
+  const y  = jadwalYear;
+  const mn = MONTHS[jadwalMonth];
+  const dayName = WDAYS_FULL[dow];
+  const dateStr = `${d} ${mn} ${y}`;
+
+  // Highlight selected day
+  document.querySelectorAll('.cal-day').forEach(el => el.classList.remove('selected-day'));
+  document.querySelectorAll(`.cal-day[data-d="${d}"]`).forEach(el => el.classList.add('selected-day'));
+
+  const isHadir   = getAbs(sid, y, mn).includes(d);
+  const savedTime = getAbsTime(sid, y, mn, d);
+  // Pre-fill from recurring schedule if nothing saved yet
+  const defaultTime = (s?.jadwal||{})[String(dow)] || '';
+  const fillTime  = savedTime || defaultTime;
+  const dur       = (s?.jadwalDur||{})[String(dow)] || '';
+  const endT      = addMinutes(fillTime, dur);
+  const durInfo   = dur ? ` · ${durLabel(dur)}${endT?' s/d '+endT:''}` : '';
+
+  const panel   = document.getElementById('day-detail-panel');
+  const titleEl = document.getElementById('day-detail-title');
+  const bodyEl  = document.getElementById('day-detail-body');
+
+  titleEl.innerHTML = `${dayName}, ${dateStr}`;
+  bodyEl.innerHTML  = `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(110,205,195,.25)">
+      <span style="font-size:13px;font-weight:700;flex:1">Status Kehadiran</span>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;cursor:pointer">
+        <input type="checkbox" id="dp-hadir" ${isHadir?'checked':''} style="width:16px;height:16px;accent-color:var(--teal)">
+        Hadir
+      </label>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(110,205,195,.25)">
+      <span style="font-size:13px;font-weight:700;flex:1">⏰ Jam Kelas</span>
+      <input type="time" id="dp-time" value="${esc(fillTime)}" style="padding:5px 10px;border-radius:8px;border:1.5px solid var(--teal);font-size:13px;font-family:'Nunito',sans-serif;font-weight:700;width:110px;color:var(--ink)">
+    </div>
+    ${dur ? `<div style="font-size:11px;color:var(--teal-dark);padding:6px 0 2px;font-weight:600">Jadwal rutin: ${defaultTime}${durInfo}</div>` : ''}
+    <div style="margin-top:10px;display:flex;gap:8px">
+      <button class="btn-sm primary" onclick="saveDayEdit(${d}, ${dow})">✓ Simpan</button>
+      <button class="btn-sm" onclick="clearDayEdit(${d})">Hapus Sesi</button>
+    </div>`;
+  panel.classList.add('open');
+}
+
+function saveDayEdit(d, dow) {
+  const sid     = document.getElementById('jadwal-murid').value;
+  if (!sid) return;
+  const mn      = MONTHS[jadwalMonth];
+  const y       = jadwalYear;
+  const isHadir = document.getElementById('dp-hadir')?.checked;
+  const time    = document.getElementById('dp-time')?.value || '';
+
+  // Update attendance
+  let days = getAbs(sid, y, mn);
+  if (isHadir && !days.includes(d)) days = [...days, d].sort((a,b)=>a-b);
+  if (!isHadir) days = days.filter(x => x !== d);
+  setAbs(sid, y, mn, days);
+
+  // Save actual session time
+  setAbsTime(sid, y, mn, d, isHadir ? time : '');
+
   renderJadwal();
-  // Sync ke Sheets
-  const days = getAbs(sid, jadwalYear, mn);
-  apiPost({ action: 'set_absensi', studentId: sid, year: jadwalYear, month: mn, days }).catch(console.warn);
+  document.getElementById('day-detail-panel').classList.remove('open');
+  showToast(isHadir ? `✓ Sesi ${d} ${mn} — ${time||'jam tidak diisi'}` : 'Sesi dihapus');
+
+  // Sync to Sheets
+  apiPost({ action: 'set_absensi', studentId: sid, year: y, month: mn, days }).catch(console.warn);
+}
+
+function clearDayEdit(d) {
+  const sid = document.getElementById('jadwal-murid').value;
+  if (!sid) return;
+  const mn  = MONTHS[jadwalMonth];
+  const y   = jadwalYear;
+  const days = getAbs(sid, y, mn).filter(x => x !== d);
+  setAbs(sid, y, mn, days);
+  setAbsTime(sid, y, mn, d, '');
+  renderJadwal();
+  document.getElementById('day-detail-panel').classList.remove('open');
+  showToast('Sesi dihapus');
+  apiPost({ action: 'set_absensi', studentId: sid, year: y, month: mn, days }).catch(console.warn);
 }
 
 // ── Jadwal Les Rutin input helpers ──────────────────
@@ -1123,44 +1220,90 @@ const JADWAL_DAYS = [
   { dow: 0, label: 'Minggu' },
 ];
 
-function renderJadwalInputs(prefix, jadwal) {
+const DUR_OPTS = [
+  { val: '30',  label: '30 mnt' },
+  { val: '45',  label: '45 mnt' },
+  { val: '60',  label: '1 jam'  },
+  { val: '90',  label: '1,5 jam'},
+  { val: '120', label: '2 jam'  },
+  { val: '150', label: '2,5 jam'},
+  { val: '180', label: '3 jam'  },
+];
+
+function durLabel(val) {
+  const o = DUR_OPTS.find(d => d.val === String(val));
+  return o ? o.label : (val ? val + ' mnt' : '');
+}
+
+function addMinutes(timeStr, mins) {
+  if (!timeStr || !mins) return '';
+  const [h, m] = timeStr.split(':').map(Number);
+  const total = h * 60 + m + parseInt(mins);
+  return `${String(Math.floor(total/60)).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`;
+}
+
+function renderJadwalInputs(prefix, jadwal, jadwalDur) {
   const wrap = document.getElementById(`${prefix}-jadwal-wrap`);
   if (!wrap) return;
   wrap.innerHTML = JADWAL_DAYS.map(({ dow, label }) => {
-    const time = jadwal ? (jadwal[String(dow)] || '') : '';
+    const time    = jadwal    ? (jadwal[String(dow)]    || '') : '';
+    const dur     = jadwalDur ? (jadwalDur[String(dow)] || '') : '';
     const checked = time !== '';
+    const durOpts = DUR_OPTS.map(o =>
+      `<option value="${o.val}" ${dur===o.val?'selected':''}>${o.label}</option>`
+    ).join('');
+    const endT = (checked && time && dur) ? `s/d ${addMinutes(time, dur)}` : '';
     return `<div class="jadwal-day-row${checked?' active':''}" id="${prefix}-jrow-${dow}">
       <label class="jadwal-day-label">
         <input type="checkbox" id="${prefix}-jc-${dow}" ${checked?'checked':''} onchange="toggleJadwalRow('${prefix}',${dow})">
         ${label}
       </label>
-      <input type="time" id="${prefix}-jt-${dow}" class="jadwal-time" value="${esc(time)}" ${checked?'':'disabled'}>
+      <input type="time" id="${prefix}-jt-${dow}" class="jadwal-time" value="${esc(time)}" ${checked?'':'disabled'} oninput="updateJadwalEnd('${prefix}',${dow})">
+      <select id="${prefix}-jd-${dow}" class="jadwal-dur" ${checked?'':'disabled'} onchange="updateJadwalEnd('${prefix}',${dow})">
+        <option value="">— dur —</option>${durOpts}
+      </select>
+      <span class="jadwal-end-time" id="${prefix}-je-${dow}">${endT}</span>
     </div>`;
   }).join('');
+}
+
+function updateJadwalEnd(prefix, dow) {
+  const tEl = document.getElementById(`${prefix}-jt-${dow}`);
+  const dEl = document.getElementById(`${prefix}-jd-${dow}`);
+  const eEl = document.getElementById(`${prefix}-je-${dow}`);
+  if (!eEl) return;
+  const time = tEl?.value || '';
+  const dur  = dEl?.value || '';
+  eEl.textContent = (time && dur) ? `s/d ${addMinutes(time, dur)}` : '';
 }
 
 function toggleJadwalRow(prefix, dow) {
   const cb  = document.getElementById(`${prefix}-jc-${dow}`);
   const inp = document.getElementById(`${prefix}-jt-${dow}`);
+  const sel = document.getElementById(`${prefix}-jd-${dow}`);
   const row = document.getElementById(`${prefix}-jrow-${dow}`);
   if (!cb || !inp) return;
-  const checked = cb.checked; // onchange fires after state update → correct value
+  const checked = cb.checked;
   inp.disabled = !checked;
+  if (sel) sel.disabled = !checked;
   row.classList.toggle('active', checked);
-  if (!checked) inp.value = '';
-  else { inp.focus(); inp.select(); }
+  if (!checked) { inp.value = ''; if (sel) sel.value = ''; updateJadwalEnd(prefix, dow); }
+  else inp.focus();
 }
 
 function readJadwalInputs(prefix) {
-  const jadwal = {};
+  const jadwal    = {};
+  const jadwalDur = {};
   JADWAL_DAYS.forEach(({ dow }) => {
     const cb  = document.getElementById(`${prefix}-jc-${dow}`);
     const inp = document.getElementById(`${prefix}-jt-${dow}`);
+    const sel = document.getElementById(`${prefix}-jd-${dow}`);
     if (cb && cb.checked && inp && inp.value) {
-      jadwal[String(dow)] = inp.value;
+      jadwal[String(dow)]    = inp.value;
+      jadwalDur[String(dow)] = sel?.value || '';
     }
   });
-  return jadwal;
+  return { jadwal, jadwalDur };
 }
 
 // ══════════════════════════════════════════════════
@@ -1734,7 +1877,7 @@ function toggleAddForm() {
   if (f.classList.contains('open')) {
     ['f-nama','f-sekolah','f-grade','f-fee','f-wa','f-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     document.getElementById('f-start').value='';
-    renderJadwalInputs('f', {});
+    renderJadwalInputs('f', {}, {});
     document.getElementById('f-nama').focus();
   }
 }
@@ -1748,8 +1891,8 @@ function saveStudent() {
   const fee    = parseInt(document.getElementById('f-fee').value)||0;
   const wa     = document.getElementById('f-wa').value.trim();
   const note   = document.getElementById('f-note').value.trim();
-  const jadwal = readJadwalInputs('f');
-  const s = { id: Date.now().toString(), nama, school, grade, start, fee, wa, note, jadwal };
+  const { jadwal, jadwalDur } = readJadwalInputs('f');
+  const s = { id: Date.now().toString(), nama, school, grade, start, fee, wa, note, jadwal, jadwalDur };
   students.push(s);
   saveStudents();
   toggleAddForm();
@@ -1778,7 +1921,7 @@ function openEdit(id) {
   document.getElementById('e-fee').value     = s.fee||'';
   document.getElementById('e-wa').value      = s.wa||'';
   document.getElementById('e-note').value    = s.note||'';
-  renderJadwalInputs('e', s.jadwal||{});
+  renderJadwalInputs('e', s.jadwal||{}, s.jadwalDur||{});
   document.getElementById('edit-overlay').classList.add('open');
 }
 function closeEdit() { document.getElementById('edit-overlay').classList.remove('open'); }
@@ -1789,13 +1932,13 @@ function saveEdit() {
   if (!nama) { showToast('⚠ Nama wajib diisi'); return; }
   students = students.map(s => s.id!==id ? s : {
     ...s, nama,
-    school:  document.getElementById('e-sekolah').value.trim(),
-    grade:   document.getElementById('e-grade').value.trim(),
-    start:   document.getElementById('e-start').value,
-    fee:     parseInt(document.getElementById('e-fee').value)||0,
-    wa:      document.getElementById('e-wa').value.trim(),
-    note:    document.getElementById('e-note').value.trim(),
-    jadwal:  readJadwalInputs('e')
+    school:    document.getElementById('e-sekolah').value.trim(),
+    grade:     document.getElementById('e-grade').value.trim(),
+    start:     document.getElementById('e-start').value,
+    fee:       parseInt(document.getElementById('e-fee').value)||0,
+    wa:        document.getElementById('e-wa').value.trim(),
+    note:      document.getElementById('e-note').value.trim(),
+    ...readJadwalInputs('e')
   });
   saveStudents(); closeEdit(); renderStudentList(); refreshAllSelects();
   showToast(`✓ Data ${nama} diperbarui`);
@@ -1803,12 +1946,19 @@ function saveEdit() {
   if (updated) apiPost({ action: 'update_murid', ...updated }).catch(console.warn);
 }
 
-function buildJadwalBadge(jadwal) {
+function buildJadwalBadge(jadwal, jadwalDur) {
   if (!jadwal) return '';
   const order = [1,2,3,4,5,6,0];
   const parts = order
     .filter(dow => jadwal[String(dow)] && jadwal[String(dow)].trim())
-    .map(dow => `${WDAYS_FULL[dow].slice(0,3)} ${jadwal[String(dow)]}`);
+    .map(dow => {
+      const time = jadwal[String(dow)];
+      const dur  = (jadwalDur||{})[String(dow)] || '';
+      const endT = addMinutes(time, dur);
+      const label = endT ? `${time}–${endT}` : time;
+      const dLabel = dur ? ` (${durLabel(dur)})` : '';
+      return `${WDAYS_FULL[dow].slice(0,3)} ${label}${dLabel}`;
+    });
   if (!parts.length) return '';
   return `<div class="student-card-meta" style="color:var(--teal-dark)">📅 ${parts.join(' · ')}</div>`;
 }
@@ -1829,7 +1979,7 @@ function renderStudentList() {
           <div class="student-card-meta">📅 Start: ${started} · 💵 Rp ${fmt(s.fee||0)}/sesi</div>
           ${s.wa?`<div class="student-card-meta">📱 ${s.wa}</div>`:''}
           ${s.note?`<div class="student-card-meta" style="font-style:italic;color:var(--muted)">📌 ${s.note}</div>`:''}
-          ${buildJadwalBadge(s.jadwal)}
+          ${buildJadwalBadge(s.jadwal, s.jadwalDur)}
         </div>
         <div class="student-card-actions">
           <button class="btn-sm" onclick="copyStudentLink('${s.id}','${esc(s.nama)}')" title="Salin link untuk orang tua">🔗 Link</button>

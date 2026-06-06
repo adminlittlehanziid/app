@@ -177,6 +177,7 @@
   }
   .cal-day:hover:not(.empty) { background: var(--teal-light); border-color: var(--teal); }
   .cal-day.teaching { background: var(--teal); border-color: var(--teal-dark); color: #fff; }
+  .cal-day.libur    { background: #f0ebe2; border-color: #d0c0a8; border-style: dashed; color: var(--muted); }
   .cal-day.has-exam { background: #FFF0D8; border-color: var(--orange); }
   .cal-day.teaching.has-exam { background: linear-gradient(135deg, var(--teal) 55%, #E8A05A 100%); color: #fff; }
   .cal-day.today { border-color: var(--yellow); }
@@ -812,6 +813,11 @@ const setAbs     = (sid, y, m, days) => lsSet(absKey(sid, y, m), days);
 const absTimeKey = (sid, y, mn, d) => `lh_abstime_${sid}_${y}_${mn}_${d}`;
 const getAbsTime = (sid, y, mn, d) => lsGet(absTimeKey(sid, y, mn, d), '');
 const setAbsTime = (sid, y, mn, d, t) => lsSet(absTimeKey(sid, y, mn, d), t||'');
+
+// Libur (skip days — scheduled but no class) per student per month
+const liburKey = (sid, y, mn) => `lh_libur_${sid}_${y}_${mn}`;
+const getLibur  = (sid, y, mn) => lsGet(liburKey(sid, y, mn), []);
+const setLibur  = (sid, y, mn, days) => lsSet(liburKey(sid, y, mn), days);
 function toggleAbs(sid, y, m, day) {
   let days = getAbs(sid, y, m);
   days = days.includes(day) ? days.filter(d => d !== day) : [...days, day].sort((a,b)=>a-b);
@@ -983,12 +989,15 @@ function renderJadwal() {
 
     let dotsHtml = '';
     let clickAttr = '';
+    const isLibur = sid ? getLibur(sid, y, mn).includes(d) : false;
 
     if (sid) {
       // Per-student mode: open edit panel on click
       const actualTime = getAbsTime(sid, y, mn, d);
       if (isTeach && actualTime) {
         dotsHtml = `<div style="font-size:8px;font-weight:800;color:rgba(255,255,255,.9);line-height:1">${actualTime}</div>`;
+      } else if (isLibur) {
+        dotsHtml = `<div style="font-size:10px;line-height:1;margin-top:1px">🚫</div>`;
       }
       clickAttr = `onclick="showStudentDayEdit(${d}, ${dow})"`;
     } else {
@@ -1007,7 +1016,7 @@ function renderJadwal() {
       clickAttr = `onclick="showDayDetail(${d}, ${dow})"`;
     }
 
-    const cls = ['cal-day', isTeach?'teaching':'', hasExam?'has-exam':'', isToday?'today':'', isWknd?'weekend':''].filter(Boolean).join(' ');
+    const cls = ['cal-day', isTeach?'teaching':(isLibur?'libur':''), hasExam?'has-exam':'', isToday?'today':'', isWknd?'weekend':''].filter(Boolean).join(' ');
     const examDot = hasExam ? `<div class="exam-dot" title="${examDays[d].join(', ')}"></div>` : '';
     html += `<div class="${cls}" ${clickAttr} data-d="${d}" data-dow="${dow}">${d}${dotsHtml}${examDot}</div>`;
   }
@@ -1136,7 +1145,12 @@ function showStudentDayEdit(d, dow) {
   document.querySelectorAll('.cal-day').forEach(el => el.classList.remove('selected-day'));
   document.querySelectorAll(`.cal-day[data-d="${d}"]`).forEach(el => el.classList.add('selected-day'));
 
-  const hadSession  = getAbs(sid, y, mn).includes(d);
+  const hadSession     = getAbs(sid, y, mn).includes(d);
+  const isLiburDay     = getLibur(sid, y, mn).includes(d);
+  const isScheduledDay = !!(s?.jadwal || {})[String(dow)];
+  // Auto-check hadir only for scheduled days (or existing sessions), not random days
+  const startChecked   = hadSession || (isScheduledDay && !isLiburDay);
+
   const savedTime   = getAbsTime(sid, y, mn, d);
   const defaultTime = (s?.jadwal||{})[String(dow)] || '';
   const fillTime    = savedTime || defaultTime;
@@ -1144,8 +1158,6 @@ function showStudentDayEdit(d, dow) {
   const endT        = addMinutes(fillTime, dur);
   const durInfo     = dur ? ` · ${durLabel(dur)}${endT?' s/d '+endT:''}` : '';
 
-  // Default checkbox = CHECKED (klik tanggal = niat tambah sesi)
-  // Uncheck manual kalau mau hapus
   const panel   = document.getElementById('day-detail-panel');
   const titleEl = document.getElementById('day-detail-title');
   const bodyEl  = document.getElementById('day-detail-body');
@@ -1155,7 +1167,7 @@ function showStudentDayEdit(d, dow) {
     <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(110,205,195,.25)">
       <span style="font-size:13px;font-weight:700;flex:1">Status Kehadiran</span>
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;cursor:pointer">
-        <input type="checkbox" id="dp-hadir" checked style="width:16px;height:16px;accent-color:var(--teal)">
+        <input type="checkbox" id="dp-hadir" ${startChecked ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--teal)">
         Hadir
       </label>
     </div>
@@ -1164,9 +1176,15 @@ function showStudentDayEdit(d, dow) {
       <input type="time" id="dp-time" value="${esc(fillTime)}" style="padding:5px 10px;border-radius:8px;border:1.5px solid var(--teal);font-size:13px;font-family:'Nunito',sans-serif;font-weight:700;width:110px;color:var(--ink)">
     </div>
     ${dur ? `<div style="font-size:11px;color:var(--teal-dark);padding:6px 0 2px;font-weight:600">Jadwal rutin: ${defaultTime}${durInfo}</div>` : ''}
-    <div style="margin-top:10px;display:flex;gap:8px">
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn-sm primary" onclick="saveDayEdit(${d}, ${dow})">✓ Simpan</button>
       ${hadSession ? `<button class="btn-sm danger" onclick="clearDayEdit(${d})">🗑 Hapus Sesi</button>` : ''}
+      ${isScheduledDay && !hadSession && !isLiburDay
+        ? `<button class="btn-sm" style="background:var(--cream);color:var(--muted);border:1.5px solid var(--border)" onclick="markLibur(${d})">🚫 Tandai Libur</button>`
+        : ''}
+      ${isLiburDay
+        ? `<button class="btn-sm" style="background:var(--orange-light);color:#C07030;border:1.5px solid var(--orange)" onclick="unmarkLibur(${d})">↩️ Batal Libur</button>`
+        : ''}
     </div>`;
   panel.classList.add('open');
 }
@@ -1186,6 +1204,8 @@ function saveDayEdit(d, dow) {
   if (!hadir && wasThere)  days = days.filter(x => x !== d);
   setAbs(sid, y, mn, days);
   setAbsTime(sid, y, mn, d, hadir ? time : '');
+  // If recording a session, remove any libur marker for this day
+  if (hadir) setLibur(sid, y, mn, getLibur(sid, y, mn).filter(x => x !== d));
 
   renderJadwal();
   document.getElementById('day-detail-panel').classList.remove('open');
@@ -1209,6 +1229,34 @@ function clearDayEdit(d) {
   document.getElementById('day-detail-panel').classList.remove('open');
   showToast('Sesi dihapus');
   apiPost({ action: 'set_absensi', studentId: sid, year: y, month: mn, days }).catch(console.warn);
+}
+
+function markLibur(d) {
+  const sid = document.getElementById('jadwal-murid').value;
+  if (!sid) return;
+  const mn  = MONTHS[jadwalMonth];
+  const y   = jadwalYear;
+  // Remove any accidentally recorded session for this day too
+  const absDays = getAbs(sid, y, mn).filter(x => x !== d);
+  setAbs(sid, y, mn, absDays);
+  setAbsTime(sid, y, mn, d, '');
+  const liburDays = getLibur(sid, y, mn);
+  if (!liburDays.includes(d)) setLibur(sid, y, mn, [...liburDays, d].sort((a,b)=>a-b));
+  renderJadwal();
+  document.getElementById('day-detail-panel').classList.remove('open');
+  showToast(`🚫 ${d} ${mn} ditandai Libur`);
+  apiPost({ action: 'set_absensi', studentId: sid, year: y, month: mn, days: absDays }).catch(console.warn);
+}
+
+function unmarkLibur(d) {
+  const sid = document.getElementById('jadwal-murid').value;
+  if (!sid) return;
+  const mn  = MONTHS[jadwalMonth];
+  const y   = jadwalYear;
+  setLibur(sid, y, mn, getLibur(sid, y, mn).filter(x => x !== d));
+  renderJadwal();
+  document.getElementById('day-detail-panel').classList.remove('open');
+  showToast(`↩️ Libur ${d} ${mn} dibatalkan`);
 }
 
 // ── Jadwal Les Rutin input helpers ──────────────────

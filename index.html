@@ -176,8 +176,9 @@
     transition: background .15s, border-color .15s; position: relative; color: var(--ink);
   }
   .cal-day:hover:not(.empty) { background: var(--teal-light); border-color: var(--teal); }
-  .cal-day.teaching { background: var(--teal); border-color: var(--teal-dark); color: #fff; }
-  .cal-day.libur    { background: #f0ebe2; border-color: #d0c0a8; border-style: dashed; color: var(--muted); }
+  .cal-day.teaching   { background: var(--teal); border-color: var(--teal-dark); color: #fff; }
+  .cal-day.scheduled  { background: var(--teal-light); border-color: var(--teal); color: var(--teal-dark); }
+  .cal-day.libur      { background: #f0ebe2; border-color: #d0c0a8; border-style: dashed; color: var(--muted); }
   .cal-day.has-exam { background: #FFF0D8; border-color: var(--orange); }
   .cal-day.teaching.has-exam { background: linear-gradient(135deg, var(--teal) 55%, #E8A05A 100%); color: #fff; }
   .cal-day.today { border-color: var(--yellow); }
@@ -191,9 +192,10 @@
   .cal-legend { display: flex; gap: 12px; margin-top: .9rem; flex-wrap: wrap; }
   .cal-legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); font-weight: 600; }
   .cal-legend-dot { width: 12px; height: 12px; border-radius: 3px; }
-  .cal-legend-dot.teaching { background: var(--teal); }
-  .cal-legend-dot.exam { background: #FFF0D8; border: 1.5px solid var(--orange); }
-  .cal-legend-dot.today { background: var(--paper); border: 2px solid var(--yellow); }
+  .cal-legend-dot.teaching   { background: var(--teal); }
+  .cal-legend-dot.scheduled  { background: var(--teal-light); border: 1.5px solid var(--teal); }
+  .cal-legend-dot.exam       { background: #FFF0D8; border: 1.5px solid var(--orange); }
+  .cal-legend-dot.today      { background: var(--paper); border: 2px solid var(--yellow); }
 
   .exam-list-wrap { margin-top: .5rem; }
   .exam-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--orange-light); border: 1.5px solid #EAC090; border-radius: 10px; margin-bottom: 6px; }
@@ -431,7 +433,8 @@
     </div>
 
     <div class="cal-legend" style="margin-top:.9rem">
-      <div class="cal-legend-item"><div class="cal-legend-dot teaching"></div>Hari Mengajar</div>
+      <div class="cal-legend-item"><div class="cal-legend-dot teaching"></div>Sudah Hadir</div>
+      <div class="cal-legend-item"><div class="cal-legend-dot scheduled"></div>Dijadwalkan</div>
       <div class="cal-legend-item"><div class="cal-legend-dot exam"></div>Ada Ujian</div>
       <div class="cal-legend-item"><div class="cal-legend-dot today"></div>Hari Ini</div>
     </div>
@@ -976,6 +979,7 @@ function renderJadwal() {
 
   const firstDay    = new Date(y, m, 1).getDay();
   const daysInMonth = new Date(y, m+1, 0).getDate();
+  const selStu      = sid ? getStu(sid) : null;  // selected student's data for schedule check
   let html = '';
 
   for (let i = 0; i < firstDay; i++) html += '<div class="cal-day empty"></div>';
@@ -986,18 +990,25 @@ function renderJadwal() {
     const isToday  = now.getFullYear()===y && now.getMonth()===m && now.getDate()===d;
     const dow      = (firstDay + d - 1) % 7;
     const isWknd   = dow===0 || dow===6;
+    const isLibur  = sid ? getLibur(sid, y, mn).includes(d) : false;
+    // Scheduled = this DOW is in the student's jadwal (regardless of recorded attendance)
+    const isScheduled = selStu ? !!(selStu.jadwal?.[String(dow)]) : false;
 
     let dotsHtml = '';
     let clickAttr = '';
-    const isLibur = sid ? getLibur(sid, y, mn).includes(d) : false;
 
     if (sid) {
       // Per-student mode: open edit panel on click
       const actualTime = getAbsTime(sid, y, mn, d);
       if (isTeach && actualTime) {
+        // Attended + time recorded → show time badge
         dotsHtml = `<div style="font-size:8px;font-weight:800;color:rgba(255,255,255,.9);line-height:1">${actualTime}</div>`;
       } else if (isLibur) {
         dotsHtml = `<div style="font-size:10px;line-height:1;margin-top:1px">🚫</div>`;
+      } else if (isScheduled && !isTeach) {
+        // Scheduled but no attendance yet → show jadwal time lightly
+        const sTime = selStu.jadwal[String(dow)];
+        dotsHtml = `<div style="font-size:7px;font-weight:700;color:var(--teal-dark);line-height:1;opacity:.75;margin-top:1px">${sTime}</div>`;
       }
       clickAttr = `onclick="showStudentDayEdit(${d}, ${dow})"`;
     } else {
@@ -1016,7 +1027,9 @@ function renderJadwal() {
       clickAttr = `onclick="showDayDetail(${d}, ${dow})"`;
     }
 
-    const cls = ['cal-day', isTeach?'teaching':(isLibur?'libur':''), hasExam?'has-exam':'', isToday?'today':'', isWknd?'weekend':''].filter(Boolean).join(' ');
+    // Priority: teaching > libur > scheduled > (none)
+    const dayState = isTeach ? 'teaching' : isLibur ? 'libur' : isScheduled ? 'scheduled' : '';
+    const cls = ['cal-day', dayState, hasExam?'has-exam':'', isToday?'today':'', isWknd?'weekend':''].filter(Boolean).join(' ');
     const examDot = hasExam ? `<div class="exam-dot" title="${examDays[d].join(', ')}"></div>` : '';
     html += `<div class="${cls}" ${clickAttr} data-d="${d}" data-dow="${dow}">${d}${dotsHtml}${examDot}</div>`;
   }

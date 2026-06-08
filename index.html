@@ -787,7 +787,16 @@ async function syncFromAPI() {
   try {
     const data = await apiGet({ action: 'get_all' });
     if (Array.isArray(data.students) && data.students.length > 0) {
-      students = data.students;
+      // Merge API data with local — preserve jadwal/jadwalDur which API doesn't return
+      const prevStudents = students.slice();
+      students = data.students.map(apiStu => {
+        const local = prevStudents.find(l => l.id === apiStu.id);
+        if (local) {
+          if (!apiStu.jadwal    && local.jadwal)    apiStu.jadwal    = local.jadwal;
+          if (!apiStu.jadwalDur && local.jadwalDur) apiStu.jadwalDur = local.jadwalDur;
+        }
+        return apiStu;
+      });
       saveStudents();
       refreshAllSelects();
       renderStudentList();
@@ -897,7 +906,12 @@ function showPage(name) {
   document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', i === PAGE_IDX[name]));
   if (name === 'murid')   renderStudentList();
   if (name === 'jadwal')  { renderJadwal(); renderExamList(); }
-  if (name === 'invoice') { loadInvoiceForm(); }
+  if (name === 'invoice') {
+    // Sync Invoice month/year to match whatever month is open in Jadwal tab
+    document.getElementById('inv-bulan').value = MONTHS[jadwalMonth];
+    document.getElementById('inv-tahun').value = String(jadwalYear);
+    loadInvoiceForm();
+  }
 }
 
 // ══════════════════════════════════════════════════

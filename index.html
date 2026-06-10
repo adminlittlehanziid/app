@@ -352,9 +352,60 @@
     .bayar-summary { flex-wrap: wrap; }
     .cal-summary { flex-wrap: wrap; }
   }
+
+  /* ── Login Overlay ── */
+  #login-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: linear-gradient(135deg, #46a89e 0%, #6ecdc3 60%, #8cdad5 100%);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #login-overlay.hidden { display: none; }
+  #login-card {
+    background: var(--paper); border-radius: 20px;
+    padding: 2.5rem 2rem 2rem; text-align: center;
+    width: min(340px, 90vw);
+    box-shadow: 0 12px 40px rgba(0,0,0,.18);
+  }
+  #login-logo { font-size: 56px; line-height: 1; margin-bottom: .4rem; }
+  #login-brand { font-size: 22px; font-weight: 800; color: var(--teal-dark); letter-spacing: -.01em; }
+  #login-sub { font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 1.8rem; }
+  #login-field { display: flex; gap: .5rem; margin-bottom: .6rem; }
+  #login-pw {
+    flex: 1; padding: .7rem 1rem; border: 1.5px solid var(--border);
+    border-radius: 10px; font-family: inherit; font-size: 14px;
+    background: #fff; color: var(--ink); outline: none;
+    transition: border-color .2s;
+  }
+  #login-pw:focus { border-color: var(--teal); }
+  #login-pw.shake { animation: loginShake .35s; border-color: var(--red); }
+  #login-field button {
+    padding: .7rem 1rem; background: var(--teal-dark); color: #fff;
+    border: none; border-radius: 10px; font-family: inherit; font-size: 14px;
+    font-weight: 700; cursor: pointer; white-space: nowrap; transition: background .15s;
+  }
+  #login-field button:hover { background: #389990; }
+  #login-err { font-size: 12px; color: var(--red); font-weight: 600; margin-top: .25rem; }
+  @keyframes loginShake {
+    0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 60%{transform:translateX(6px)} 80%{transform:translateX(-3px)}
+  }
 </style>
 </head>
 <body>
+
+<!-- ══ Login Overlay ══ -->
+<div id="login-overlay">
+  <div id="login-card">
+    <div id="login-logo">🐼</div>
+    <div id="login-brand">Little Hanzi</div>
+    <div id="login-sub">Dashboard Guru — Admin</div>
+    <div id="login-field">
+      <input type="password" id="login-pw" placeholder="Masukkan password…"
+             onkeydown="if(event.key==='Enter')checkLogin()">
+      <button onclick="checkLogin()">Masuk →</button>
+    </div>
+    <div id="login-err" style="display:none">Password salah, coba lagi.</div>
+  </div>
+</div>
 
 <header>
   <div class="header-inner">
@@ -2119,9 +2170,35 @@ function showToast(msg) {
 }
 
 // ══════════════════════════════════════════════════
+// ══ Login ══
+const _LH_PW = 'bGh6MTIzNCE='; // btoa('lhz1234!')
+function checkLogin() {
+  const pw = document.getElementById('login-pw').value;
+  const err = document.getElementById('login-err');
+  const inp = document.getElementById('login-pw');
+  if (btoa(pw) === _LH_PW) {
+    sessionStorage.setItem('lh_auth', '1');
+    document.getElementById('login-overlay').classList.add('hidden');
+    err.style.display = 'none';
+    init();
+  } else {
+    inp.classList.remove('shake');
+    void inp.offsetWidth; // reflow to restart animation
+    inp.classList.add('shake');
+    err.style.display = 'block';
+    inp.value = '';
+    inp.focus();
+  }
+}
+
 // START
 // ══════════════════════════════════════════════════
-init();
+if (sessionStorage.getItem('lh_auth') === '1') {
+  document.getElementById('login-overlay').classList.add('hidden');
+  init();
+} else {
+  document.getElementById('login-pw').focus();
+}
 </script>
 </body>
 </html>
